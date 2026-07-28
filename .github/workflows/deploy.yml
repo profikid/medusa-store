@@ -1,0 +1,304 @@
+name: Deploy
+
+# Deploys to prod whenever CI goes green on main. The image is built
+# and pushed to ghcr.io in the CI workflow; this workflow's job is
+# only to pull the image onto prod and recreate the containers.
+#
+# The "local and prod run the same code" invariant is enforced by:
+#   - CI builds the image FROM THE REPO on the runner (not on a dev
+#     laptop), with the same NEXT_PUBLIC_* baked in via secrets.
+#   - Deploy pulls the EXACT SHA CI just published — no rebuild on
+#     prod, no dev "but it works on my machine" drift.
+#   - Smoke test asserts the running container's image digest matches
+#     the SHA we just deployed. HTTP 200 alone is not a deploy proof.
+#
+# Repo secrets (this workflow):
+#   PROD_SSH_KEY  — RSA-4096 PEM format. Do NOT use ed25519/OpenSSH
+#                   format: GHA secrets storage can silently mangle
+#                   them (libcrypto parse error at ssh-keygen).
+#   PROD_HOST     — "root@<host>" form (e.g. "root@tracecore.profikid.nl")
+#   GHCR_TOKEN    — fine-grained PAT with `read:packages` scope on
+#                   profikid/medusa-store. Used by prod `docker pull`.
+#                   Operator's personal gh CLI token is over-scoped;
+#                   mint a dedicated one.
+#
+# One-time prod bootstrap:
+#   On prod, `docker login ghcr.io -u <owner>` with GHCR_TOKEN. This
+#   writes /root/.docker/config.json (0600). Don't skip this — without
+#   it every pull 401s.
+#
+# Repo setting required (one-time):
+#   Settings → Actions → General → Workflow permissions → "Read and
+#   write permissions". Already set for this repo.
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+# Sequential deploys to the same host. cancel-in-progress=false so a
+# push that lands mid-deploy waits its turn rather than leaving prod
+# half-rebuilt.
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    name: Deploy to prod
+    runs-on: ubuntu-22.04
+    # docker pull + docker compose up -d + 30 healthcheck iterations
+    # × 2s = 60s + smoke test. 15 min is plenty. If it exceeds 15 min
+    # something is genuinely wrong (auth, network) and we want it to
+    # time out rather than silently hang. The build itself happens in
+    # CI, not here.
+    timeout-minutes: 15
+
+    steps:
+      - name: Resolve deploy SHA
+        id: sha
+        run: |
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          if [ -z "$SHA" ]; then SHA="$(git rev-parse HEAD)"; fi
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Deploying IMAGE=ghcr.io/profikid/medusa-store:${SHA:0:12}"
+
+      - name: Install SSH key
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s' "$PROD_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Hard-fail on a corrupted secret — better to fail the deploy
+          # loudly than to fail at "Permission denied (publickey)" 5
+          # steps later with no diagnostic.
+          if ! ssh-keygen -y -f ~/.ssh/id_ed25519 > ~/.ssh/id_ed25519.pub 2>&1; then
+            echo "::error::ssh-keygen rejected the PROD_SSH_KEY secret — check the format"
+            exit 1
+          fi
+
+      - name: Trust prod host
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          HOST="${PROD_HOST#*@}"   # strip "user@"
+          ssh-keyscan -H -t ed25519 -p 22 "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Pull image and recreate prod containers
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          DEPLOY_SHA: ${{ steps.sha.outputs.sha }}
+          IMAGE_REPO: profikid/medusa-store
+          IMAGE: ghcr.io/${{ env.IMAGE_REPO }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_ed25519 \
+              -o StrictHostKeyChecking=accept-new \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              "$PROD_HOST" \
+              bash -s -- "$DEPLOY_SHA" "$IMAGE" "$IMAGE_REPO" "$GHCR_TOKEN" <<'REMOTE'
+            set -euo pipefail
+            DEPLOY_SHA="$1"
+            IMAGE="$2"
+            IMAGE_REPO="$3"
+            GHCR_TOKEN="$4"
+            PROD_DIR="/docker/medusa"
+
+            cd "$PROD_DIR"
+            echo "[deploy] start IMAGE=$IMAGE:$DEPLOY_SHA ts=$(date -u +%FT%TZ)"
+
+            # Previous-SHA rollback target, written by the LAST
+            # successful deploy and read by THIS deploy. Independent
+            # of the image (which we don't author labels for).
+            PREVIOUS_SHA=""
+            if [ -f .deployed-sha ]; then PREVIOUS_SHA="$(cat .deployed-sha)"; fi
+            echo "[deploy] previous deployed SHA=${PREVIOUS_SHA:-<none>}"
+
+            echo "[deploy] docker login ghcr.io (ephemeral, no config.json written)"
+            # Use the GHCR_TOKEN from GHA secrets. We pipe the password
+            # through stdin so it's not in the process list. NEITHER
+            # --password NOR the token appears in the build log under
+            # bash command tracing (set -x), because stdin is not
+            # echoed by the shell.
+            printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u profikid --password-stdin >/dev/null 2>&1
+
+            echo "[deploy] docker pull $IMAGE:$DEPLOY_SHA"
+            docker pull "$IMAGE:$DEPLOY_SHA"
+
+            # Belt + suspenders: remove the creds we just wrote so a
+            # future prod compromise doesn't leak them. The deploy is
+            # already done; the next deploy authenticates fresh.
+            docker logout ghcr.io >/dev/null 2>&1 || true
+
+            # Pin the image in compose so a server reboot comes back up
+            # pointing at the right thing. The sed only touches the
+            # image: lines for the `medusa` and `storefront` services
+            # — never secrets/env, which live in /docker/medusa/.env
+            # (compose reads ${VAR:?must be set}).
+            #
+            # The pattern MUST match BOTH the local-dev form
+            # (`image: medusa-store:tag`) AND the post-deploy form
+            # (`image: ghcr.io/profikid/medusa-store:sha`). A pattern
+            # that matches only one form silently no-ops from the
+            # second deploy onwards — see SKILL.md "self-mutating
+            # regex trap" pitfall.
+            sed -i -E "s#^    image: (medusa-store|${IMAGE}):.*\$#    image: ${IMAGE}:${DEPLOY_SHA}#" docker-compose.yml
+
+            echo "[deploy] --- docker-compose.yml image: lines after sed ---"
+            grep -nE '^\s*image:' docker-compose.yml || true
+
+            echo "[deploy] docker compose up -d"
+            docker compose up -d
+
+            echo "[deploy] waiting for medusa + storefront healthy"
+            for svc in medusa_storefront medusa_backend; do
+              STATE="starting"
+              for i in $(seq 1 30); do
+                STATE="$(docker inspect -f '{{.State.Health.Status}}' "$svc" 2>/dev/null || echo missing)"
+                [ "$STATE" = "healthy" ] && break
+                sleep 2
+              done
+              if [ "$STATE" != "healthy" ]; then
+                echo "[deploy] FATAL: $svc not healthy in 60s; last state=$STATE" >&2
+                docker logs --tail 50 "$svc" >&2 || true
+                if [ -n "$PREVIOUS_SHA" ]; then
+                  echo "[deploy] rolling back to previous image $PREVIOUS_SHA" >&2
+                  sed -i -E "s#^    image: (medusa-store|${IMAGE}):.*\$#    image: ${IMAGE}:${PREVIOUS_SHA}#" docker-compose.yml
+                  docker compose up -d || true
+                fi
+                exit 1
+              fi
+              echo "[deploy] $svc healthy"
+            done
+
+            # Stamp the deployed SHA on disk so the NEXT deploy can
+            # roll back to this one if it fails. Written *after* all
+            # checks pass, so a failed deploy leaves the file pointing
+            # at the still-good previous SHA.
+            echo "$DEPLOY_SHA" > .deployed-sha
+            echo "[deploy] done SHA=$DEPLOY_SHA"
+          REMOTE
+
+      - name: Post-deploy external smoke test
+        env:
+          DEPLOY_SHA: ${{ steps.sha.outputs.sha }}
+          STOREFRONT_URL: https://store.medusa.tracecore.profikid.nl
+          ADMIN_URL: https://medusa.tracecore.profikid.nl
+        run: |
+          set -euo pipefail
+          for URL in "$STOREFRONT_URL" "$ADMIN_URL"; do
+            echo "[smoke] GET $URL"
+            HTTP_CODE="$(curl -sS -o /tmp/smoke.html -w '%{http_code}' "$URL" --max-time 30)"
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "[smoke] FAIL: $URL → HTTP $HTTP_CODE" >&2
+              head -20 /tmp/smoke.html >&2 || true
+              exit 1
+            fi
+            echo "[smoke] OK: $URL → HTTP 200"
+          done
+
+      - name: Verify running image digest matches deployed SHA
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          DEPLOY_SHA: ${{ steps.sha.outputs.sha }}
+          IMAGE_REPO: profikid/medusa-store
+        run: |
+          set -euo pipefail
+          # A 200 with the wrong image is exactly the failure mode the
+          # previous "WARN" behavior masked. The image ID is the
+          # ground truth — the container's `Image` field must match
+          # the SHA-tagged image we just pulled.
+          EXPECTED="ghcr.io/${IMAGE_REPO}:${DEPLOY_SHA}"
+          echo "[smoke] verifying container Image == ${EXPECTED}"
+          ssh -i ~/.ssh/id_ed25519 \
+              -o StrictHostKeyChecking=accept-new \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              "$PROD_HOST" \
+              bash -s -- "$EXPECTED" <<'REMOTE'
+            set -euo pipefail
+            EXPECTED="$1"
+            for svc in medusa_storefront medusa_backend; do
+              ACTUAL="$(docker inspect -f '{{.Config.Image}}' "$svc" 2>/dev/null || echo unknown)"
+              if [ "$ACTUAL" != "$EXPECTED" ]; then
+                echo "[smoke] FAIL: $svc Image=$ACTUAL, expected=$EXPECTED" >&2
+                exit 1
+              fi
+              echo "[smoke] OK: $svc Image=$ACTUAL"
+            done
+          REMOTE
+
+      - name: Prune unused medusa-store images on prod
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          DEPLOY_SHA: ${{ steps.sha.outputs.sha }}
+          IMAGE_REPO: profikid/medusa-store
+        run: |
+          set -uo pipefail   # NO -e — see below
+          ssh -i ~/.ssh/id_ed25519 \
+              -o StrictHostKeyChecking=accept-new \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              "$PROD_HOST" \
+              bash -s -- "$DEPLOY_SHA" "$IMAGE_REPO" <<'REMOTE'
+            set -uo pipefail
+            DEPLOY_SHA="$1"
+            IMAGE_REPO="$2"
+
+            echo "[cleanup] disk before:"
+            df -h / | tail -1
+
+            # List every ${IMAGE_REPO} image on the host, then drop
+            # the ones not referenced by any container (running OR
+            # stopped). The live SHA + any stopped container's image
+            # is kept. Other-repo images are NEVER touched.
+            REFERENCED="$(docker ps -a --format '{{.Image}}' | sort -u)"
+            ALL_IDS="$(docker images --format '{{.ID}}' \
+              --filter "reference=ghcr.io/${IMAGE_REPO}:*")"
+
+            DROPPED=0; DROPPED_BYTES=0
+            for img in $ALL_IDS; do
+              if echo "$REFERENCED" | grep -qFx "$img"; then
+                echo "[cleanup] KEEP $img (referenced by a container)"
+                continue
+              fi
+              SIZE="$(docker image inspect "$img" --format '{{.Size}}' 2>/dev/null || echo 0)"
+              if docker rmi "$img" 2>/dev/null; then
+                echo "[cleanup] DROP $img ($(numfmt --to=iec "$SIZE" 2>/dev/null || echo "$SIZE B"))"
+                DROPPED=$((DROPPED + 1))
+                DROPPED_BYTES=$((DROPPED_BYTES + SIZE))
+              else
+                echo "[cleanup] WARN $img could not be removed (held by a tag)" >&2
+              fi
+            done
+            echo "[cleanup] dropped $DROPPED medusa-store image(s), reclaimed $(numfmt --to=iec "$DROPPED_BYTES" 2>/dev/null || echo "$DROPPED_BYTES B")"
+
+            # Tag-less dangling images (any repo — by definition no
+            # tag reference, so safe to drop).
+            DANGLING="$(docker images -f 'dangling=true' -q)"
+            DANGLING_COUNT=0
+            for img in $DANGLING; do
+              if docker rmi "$img" 2>/dev/null; then DANGLING_COUNT=$((DANGLING_COUNT + 1)); fi
+            done
+            [ "$DANGLING_COUNT" -gt 0 ] && echo "[cleanup] dropped $DANGLING_COUNT dangling image(s)"
+
+            # Containerd content store orphans (docker image prune
+            # cannot touch these).
+            ctr --namespace moby content prune references 2>&1 | tail -3 || true
+
+            echo "[cleanup] disk after:"
+            df -h / | tail -1
+
+            # Hard fail only if disk is STILL critical — operator
+            # attention needed.
+            USED_PCT="$(df / --output=pcent | tail -1 | tr -dc '0-9')"
+            if [ -n "$USED_PCT" ] && [ "$USED_PCT" -ge 95 ]; then
+              echo "[cleanup] FATAL: prod disk is still ${USED_PCT}% full after pruning" >&2
+              exit 1
+            fi
+            echo "[cleanup] OK disk at ${USED_PCT:-?}%"
+          REMOTE
