@@ -23,7 +23,9 @@ services:
 
   # Medusa Server (backend + admin dashboard on :9000)
   medusa:
-    build: .
+    build:
+      context: .
+      args: {}
     container_name: medusa_backend
     restart: unless-stopped
     depends_on:
@@ -58,7 +60,13 @@ services:
 
   # Storefront (Next.js on :8000) - separate hostname
   storefront:
-    build: .
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY:-pk_build_placeholder}
+        NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${NEXT_PUBLIC_MEDUSA_BACKEND_URL:-https://medusa.tracecore.profikid.nl}
+        NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://store.medusa.tracecore.profikid.nl}
+        NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-dk}
     container_name: medusa_storefront
     restart: unless-stopped
     depends_on:

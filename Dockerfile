@@ -14,6 +14,17 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
+# Build-time args for storefront public env vars (Next.js bakes NEXT_PUBLIC_* into client bundle)
+ARG NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=pk_build_placeholder
+ARG NEXT_PUBLIC_MEDUSA_BACKEND_URL=https://medusa.tracecore.profikid.nl
+ARG NEXT_PUBLIC_BASE_URL=https://store.medusa.tracecore.profikid.nl
+ARG NEXT_PUBLIC_DEFAULT_REGION=dk
+ENV NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=$NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
+ENV NEXT_PUBLIC_MEDUSA_BACKEND_URL=$NEXT_PUBLIC_MEDUSA_BACKEND_URL
+ENV NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL
+ENV NEXT_PUBLIC_DEFAULT_REGION=$NEXT_PUBLIC_DEFAULT_REGION
+ENV NODE_ENV=production
+
 # Build both apps via turbo (produces apps/backend/.medusa/server + apps/storefront/.next)
 RUN pnpm build
 
