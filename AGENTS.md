@@ -144,6 +144,59 @@ claude mcp add --transport http medusa https://docs.medusajs.com/mcp # or agent 
 - Running the test task without a reachable PostgreSQL — integration suites need a live DB.
 - Silencing `@medusajs/*` ESLint rules instead of fixing the underlying pattern.
 
+## Medusa Skills (load before writing code)
+
+The Medusa skills below are **already installed** in `~/.hermes/skills/medusa/`
+(and equivalent locations for other agents). Load them **before** writing
+code in the area they cover — they encode architectural rules that are not
+obvious from the framework defaults and that ESLint cannot catch.
+
+**Load the named skill, then load its `reference/` files referenced from the
+skill body** — the quick reference in `SKILL.md` is not sufficient for
+non-trivial implementation.
+
+| When you touch... | Load first | Reference files to also load |
+|---|---|---|
+| `apps/backend/src/modules/**`, `workflows/**`, `api/**`, `links/**`, `subscribers/**`, `jobs/**`, or anything under `apps/backend/src/` outside `admin/` | `building-with-medusa` | `reference/custom-modules.md`, `reference/workflows.md`, `reference/api-routes.md`, `reference/module-links.md`, `reference/querying-data.md`, `reference/authentication.md` (load the 1-2 relevant to your task) |
+| `apps/backend/src/admin/**` (widgets, routes, i18n) | `building-admin-dashboard-customizations` | (skill body is sufficient for most widget work) |
+| `apps/storefront/src/**` (components, hooks, SDK usage, React Query) | `building-storefronts` | `references/frontend-integration.md` |
+| Storefront UX/perf/conversion decisions (not code patterns) | `storefront-best-practices` | (skill body is sufficient) |
+| New or changed data model on a custom module | `building-with-medusa` → then `db-generate` → then `db-migrate` | — |
+| Adding/changing admin users from the CLI | `new-user` | — |
+| AI agent logic in the backend | `creating-internal-agents` | — |
+| First time onboarding to the Medusa architecture | `learning-medusa` | — |
+
+**Skip these** unless the user explicitly asks for Medusa Cloud migration
+(this project is self-hosted behind Traefik):
+
+- `mcloud-auth`, `mcloud-deployments`, `mcloud-environments`, `mcloud-local`,
+  `mcloud-logs`, `mcloud-organizations`, `mcloud-projects`, `mcloud-variables`,
+  `using-medusa-cloud`
+
+### Non-obvious rules the skills enforce (do not skip)
+
+These are the gotchas that surface as silent runtime errors or silent data
+loss — the kind that don't show up in a type check:
+
+- **Architecture**: Module (CRUD) → Workflow (mutation + rollback) → API Route
+  (HTTP only) → Frontend (SDK). Never call module services from routes. Only
+  GET/POST/DELETE — never PUT/PATCH.
+- **Workflow composition**: regular `function` (not arrow, not `async`), no
+  `await`, no conditionals (use `when()`), no variable math (use
+  `transform()`). The workflow function runs at load time, not per-request.
+- **Module names**: camelCase only — dashes cause runtime errors.
+- **Data models**: never add `.linkable()` — auto-added by the framework.
+- **Prices**: stored as-is (`$49.99 = 49.99`, never in cents). Never multiply
+  by 100 on save or divide by 100 on display.
+- **Cross-module data**: use `query.graph()` for joined reads; use
+  `query.index()` when filtering by properties of a linked module (graph can't).
+- **Storefront API calls**: always `sdk.client.fetch()` or
+  `sdk.store.*` / `sdk.admin.*`. Never `fetch()` — missing headers = silent 401.
+  Never `JSON.stringify()` the body — SDK serializes, double-encoding breaks parsing.
+- **Admin user commands**: when creating users via `medusa user`, do not
+  reuse email addresses across re-runs — the seed scripts and migrations are
+  not idempotent for user creation.
+
 ## Off-Limits
 
 - `apps/backend/.medusa/`, `.next/`, `dist/`, `out/`, `.turbo/` — build output, excluded from the workspace and regenerated.
