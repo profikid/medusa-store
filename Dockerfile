@@ -40,18 +40,23 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .npmrc ./
 COPY apps/backend/package.json ./apps/backend/
 COPY apps/storefront/package.json ./apps/storefront/
 
-# Install production deps only (no devDeps). pnpm's --prod flag skips devDependencies.
-RUN pnpm install --frozen-lockfile --prod
+# Install all deps (including devDeps — needed at runtime: ts-node to compile
+# medusa-config.ts, typescript for any TS source references, etc.)
+RUN pnpm install --frozen-lockfile
 
 # Copy built artifacts from builder
 COPY --from=builder /server/apps/backend/.medusa ./apps/backend/.medusa
-COPY --from=builder /server/apps/storefront/.next ./apps/storefront/.next
-
-# Source still needed at runtime: medusa-config.ts, scripts, etc.
 COPY --from=builder /server/apps/backend/medusa-config.ts ./apps/backend/medusa-config.ts
 COPY --from=builder /server/apps/backend/src ./apps/backend/src
 COPY --from=builder /server/apps/backend/instrumentation.ts ./apps/backend/instrumentation.ts
+COPY --from=builder /server/apps/backend/tsconfig.json ./apps/backend/
+COPY --from=builder /server/apps/backend/tsconfig.tsbuildinfo ./apps/backend/
+
+COPY --from=builder /server/apps/storefront/.next ./apps/storefront/.next
+
+# Storefront config + check-env-variables.js (required by next.config.js)
 COPY --from=builder /server/apps/storefront/next.config.js ./apps/storefront/
+COPY --from=builder /server/apps/storefront/check-env-variables.js ./apps/storefront/
 COPY --from=builder /server/apps/storefront/next-env.d.ts ./apps/storefront/
 COPY --from=builder /server/apps/storefront/next-sitemap.js ./apps/storefront/
 COPY --from=builder /server/apps/storefront/postcss.config.js ./apps/storefront/
