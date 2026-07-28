@@ -90,6 +90,7 @@ COPY --from=builder /server/apps/backend/public ./apps/backend/public
 COPY --from=builder /server/apps/storefront/src ./apps/storefront/src
 COPY --from=builder /server/apps/storefront/public ./apps/storefront/public
 COPY --from=builder /server/apps/storefront/next.config.js ./apps/storefront/
+COPY --from=builder /server/apps/storefront/tsconfig.json ./apps/storefront/
 COPY --from=builder /server/apps/storefront/check-env-variables.js ./apps/storefront/
 COPY --from=builder /server/apps/storefront/package.json ./apps/storefront/
 
