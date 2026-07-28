@@ -21,11 +21,9 @@ services:
     networks:
       - medusa
 
-  # Medusa Server (backend + admin dashboard on :9000)
+  # Medusa Server (backend + admin on :9000, admin dev HMR on :5173)
   medusa:
-    build:
-      context: .
-      args: {}
+    build: .
     container_name: medusa_backend
     restart: unless-stopped
     depends_on:
@@ -33,12 +31,18 @@ services:
       - redis
     expose:
       - "9000"
+      - "5173"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - DATABASE_URL=postgres://postgres:postgres@postgres:5432/medusa-store
       - REDIS_URL=redis://redis:6379
     env_file:
       - apps/backend/.env
+    volumes:
+      - .:/server
+      - /server/node_modules
+      - /server/apps/backend/node_modules
+      - /server/apps/storefront/node_modules
     networks:
       - medusa
       - tracecoreagent_default
@@ -60,13 +64,7 @@ services:
 
   # Storefront (Next.js on :8000) - separate hostname
   storefront:
-    build:
-      context: .
-      args:
-        NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY:-pk_build_placeholder}
-        NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${NEXT_PUBLIC_MEDUSA_BACKEND_URL:-https://medusa.tracecore.profikid.nl}
-        NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://store.medusa.tracecore.profikid.nl}
-        NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-dk}
+    build: .
     container_name: medusa_storefront
     restart: unless-stopped
     depends_on:
@@ -74,10 +72,15 @@ services:
     expose:
       - "8000"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - NEXT_PUBLIC_MEDUSA_BACKEND_URL=https://medusa.tracecore.profikid.nl
     env_file:
       - apps/storefront/.env
+    volumes:
+      - .:/server
+      - /server/node_modules
+      - /server/apps/backend/node_modules
+      - /server/apps/storefront/node_modules
     entrypoint: ["./start-storefront.sh"]
     networks:
       - medusa

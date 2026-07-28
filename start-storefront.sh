@@ -1,5 +1,5 @@
 #!/bin/sh
 cd /server/apps/storefront
 
-echo "Starting Next.js production server..."
-exec pnpm exec next start -p 8000 -H 0.0.0.0
+echo "Starting Next.js development server (HMR via Turbopack)..."
+exec pnpm exec next dev --turbopack -p 8000 -H 0.0.0.0
