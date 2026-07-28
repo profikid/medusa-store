@@ -8,6 +8,12 @@ export const metadata: Metadata = {
   description: "Something went wrong",
 }
 
+// Skip static prerender of /404 — Next.js 15.5.21 has a bug where the
+// legacy _error fallback chunk imports <Html> from next/document during
+// the static page generation phase, which fails. Rendering at runtime
+// avoids the static-prerender code path entirely.
+export const dynamic = "force-dynamic"
+
 export default function NotFound() {
   return (
     <div className="flex flex-col gap-4 items-center justify-center min-h-[calc(100vh-64px)]">
