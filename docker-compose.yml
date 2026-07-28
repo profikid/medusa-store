@@ -1,0 +1,106 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: medusa_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: medusa-store
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - medusa
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: medusa_redis
+    restart: unless-stopped
+    networks:
+      - medusa
+
+  # Medusa Server (backend + admin dashboard on :9000, admin dev/HMR on :5173)
+  medusa:
+    build: .
+    container_name: medusa_backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+    expose:
+      - "9000"
+      - "5173"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/medusa-store
+      - REDIS_URL=redis://redis:6379
+    env_file:
+      - apps/backend/.env
+    volumes:
+      - .:/server
+      - /server/node_modules
+      - /server/apps/backend/node_modules
+      - /server/apps/storefront/node_modules
+    networks:
+      - medusa
+      - tracecoreagent_default
+    labels:
+      - traefik.enable=true
+      # Main public router: backend API + admin dashboard
+      - traefik.http.routers.medusa-storefront.rule=Host(`medusa.agent.profikid.nl`)
+      - traefik.http.routers.medusa-storefront.entrypoints=websecure
+      - traefik.http.routers.medusa-storefront.tls=true
+      - traefik.http.routers.medusa-storefront.tls.certresolver=mytlschallenge
+      - traefik.http.services.medusa-storefront.loadbalancer.server.port=9000
+      # HTTP → HTTPS redirect
+      - traefik.http.routers.medusa-storefront-http.rule=Host(`medusa.agent.profikid.nl`)
+      - traefik.http.routers.medusa-storefront-http.entrypoints=web
+      - traefik.http.routers.medusa-storefront-http.middlewares=medusa-redirect@docker
+      - traefik.http.middlewares.medusa-redirect.redirectscheme.scheme=https
+      - traefik.http.middlewares.medusa-redirect.redirectscheme.permanent=true
+
+  # Storefront (Next.js on :8000) - separate hostname
+  storefront:
+    build: .
+    container_name: medusa_storefront
+    restart: unless-stopped
+    depends_on:
+      - medusa
+    expose:
+      - "8000"
+    environment:
+      - NEXT_PUBLIC_MEDUSA_BACKEND_URL=http://medusa:9000
+    env_file:
+      - apps/storefront/.env
+    volumes:
+      - .:/server
+      - /server/node_modules
+      - /server/apps/backend/node_modules
+      - /server/apps/storefront/node_modules
+      - /server/apps/storefront/.next
+    entrypoint: ["./start-storefront.sh"]
+    networks:
+      - medusa
+      - tracecoreagent_default
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.medusa-store.rule=Host(`store.medusa.agent.profikid.nl`)
+      - traefik.http.routers.medusa-store.entrypoints=websecure
+      - traefik.http.routers.medusa-store.tls=true
+      - traefik.http.routers.medusa-store.tls.certresolver=mytlschallenge
+      - traefik.http.services.medusa-store.loadbalancer.server.port=8000
+      - traefik.http.routers.medusa-store-http.rule=Host(`store.medusa.agent.profikid.nl`)
+      - traefik.http.routers.medusa-store-http.entrypoints=web
+      - traefik.http.routers.medusa-store-http.middlewares=medusa-redirect@docker
+
+volumes:
+  postgres_data:
+
+networks:
+  medusa:
+    driver: bridge
+  tracecoreagent_default:
+    external: true
+    name: tracecoreagent_default
