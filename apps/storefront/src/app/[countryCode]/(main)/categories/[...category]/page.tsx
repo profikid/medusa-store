@@ -8,6 +8,10 @@ import CategoryTemplate from "@modules/categories/templates"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
 import { parseOptionValueIds } from "@lib/util/product-option-filters"
 
+// Skip SSG for category pages — they fetch from the backend at build time
+// which fails when building in an isolated Docker stage with no backend reachable.
+export const dynamic = "force-dynamic"
+
 type Props = {
   params: Promise<{ category: string[]; countryCode: string }>
   searchParams: Promise<
