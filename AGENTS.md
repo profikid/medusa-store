@@ -144,6 +144,26 @@ claude mcp add --transport http medusa https://docs.medusajs.com/mcp # or agent 
 - Running the test task without a reachable PostgreSQL — integration suites need a live DB.
 - Silencing `@medusajs/*` ESLint rules instead of fixing the underlying pattern.
 
+## Region
+
+- Default region: **DK** (`NEXT_PUBLIC_DEFAULT_REGION=dk`). Region name in DB is "Europe" (reg_01KYK4ND6MSS8TPGS6AHS57J50), countries: dk/fr/de/it/es/se/gb.
+- The storefront data layer `apps/storefront/src/lib/data/regions.ts` falls back to `process.env.NEXT_PUBLIC_DEFAULT_REGION` (not "us") — keep that in sync with the env var.
+- Middleware in `apps/storefront/src/middleware.ts` already redirects unknown country codes → "/" → dk first.
+
+## Payment Providers
+
+- Backend registers `@medusajs/medusa/payment-stripe` in `medusa-config.ts` (id: `stripe`). It exposes as `pp_stripe_stripe` in the storefront.
+- Keys: `STRIPE_API_KEY` + `STRIPE_WEBHOOK_SECRET` in `apps/backend/.env`. Publishable key: `NEXT_PUBLIC_STRIPE_KEY` in `apps/storefront/.env`.
+- Provider activation is lazy — first time a customer reaches checkout with `provider_id=stripe`, Medusa creates the `payment_provider` row + links it to the region. For fresh boots without a checkout, run `apps/backend/src/scripts/activate-stripe.ts` via `medusa exec` after `initial-data-seed`.
+- The starter storefront already has Stripe Element UI under `apps/storefront/src/modules/checkout/components/payment-wrapper/` — nothing custom needed unless you want a different payment UX.
+
+## Host Setup
+
+- Dev (this branch): both backend and storefront run via `medusa develop` + `next dev` inside their respective containers. Hot reload, Vite HMR via Traefik wss://medusa.tracecore.profikid.nl.
+- Production: `medusa start` + `next start -p 8000`. Multi-stage Dockerfile at repo root builds both then runs the prebuilt bundle.
+- To redeploy after edits: `docker compose restart <service>` for dev mode (no rebuild); `docker compose build && up -d` for prod.
+
+
 ## Medusa Skills (load before writing code)
 
 The Medusa skills below are **already installed** in `~/.hermes/skills/medusa/`
