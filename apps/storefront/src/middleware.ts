@@ -29,11 +29,11 @@ async function getRegionMap(cacheId: string) {
       headers: {
         "x-publishable-api-key": PUBLISHABLE_API_KEY!,
       },
-      next: {
-        revalidate: 3600,
-        tags: [`regions-${cacheId}`],
-      },
-      cache: "force-cache",
+      // No cache + no revalidate: avoids Next.js 15.5 production-mode race where
+      // a cached response body has already flushed before we try to mutate the
+      // response headers from the middleware ("Cannot append headers after they
+      // are sent to the client"). The region map is already process-cached below.
+      cache: "no-store",
     })
 
     if (!response.ok) {

@@ -12,6 +12,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - medusa
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d medusa-store"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   # Redis
   redis:
@@ -21,28 +26,28 @@ services:
     networks:
       - medusa
 
-  # Medusa Server (backend + admin on :9000, admin dev HMR on :5173)
+  # Medusa Server (production: backend + admin on :9000)
   medusa:
-    build: .
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY:?Set this in apps/storefront/.env or root .env}
+        NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${NEXT_PUBLIC_MEDUSA_BACKEND_URL:-https://medusa.tracecore.profikid.nl}
+        NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://store.medusa.tracecore.profikid.nl}
+        NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-dk}
     container_name: medusa_backend
     restart: unless-stopped
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     expose:
       - "9000"
-      - "5173"
-    environment:
-      - NODE_ENV=development
-      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/medusa-store
-      - REDIS_URL=redis://redis:6379
-    env_file:
-      - apps/backend/.env
+    # Mount .env files at the exact path Medusa's loadEnv() reads them.
+    # We can't COPY them in Dockerfile because .dockerignore blocks .env*.
     volumes:
-      - .:/server
-      - /server/node_modules
-      - /server/apps/backend/node_modules
-      - /server/apps/storefront/node_modules
+      - ./apps/backend/.env:/server/apps/backend/.env:ro
     networks:
       - medusa
       - tracecoreagent_default
@@ -50,38 +55,36 @@ services:
       - traefik.enable=true
       - traefik.docker.network=tracecoreagent_default
       # Main public router: backend API + admin dashboard
-      - traefik.http.routers.medusa-storefront.rule=Host(`medusa.tracecore.profikid.nl`)
-      - traefik.http.routers.medusa-storefront.entrypoints=websecure
-      - traefik.http.routers.medusa-storefront.tls=true
-      - traefik.http.routers.medusa-storefront.tls.certresolver=mytlschallenge
-      - traefik.http.services.medusa-storefront.loadbalancer.server.port=9000
+      - traefik.http.routers.medusa-api.rule=Host(`medusa.tracecore.profikid.nl`)
+      - traefik.http.routers.medusa-api.entrypoints=websecure
+      - traefik.http.routers.medusa-api.tls=true
+      - traefik.http.routers.medusa-api.tls.certresolver=mytlschallenge
+      - traefik.http.services.medusa-api.loadbalancer.server.port=9000
       # HTTP → HTTPS redirect
-      - traefik.http.routers.medusa-storefront-http.rule=Host(`medusa.tracecore.profikid.nl`)
-      - traefik.http.routers.medusa-storefront-http.entrypoints=web
-      - traefik.http.routers.medusa-storefront-http.middlewares=medusa-redirect@docker
+      - traefik.http.routers.medusa-api-http.rule=Host(`medusa.tracecore.profikid.nl`)
+      - traefik.http.routers.medusa-api-http.entrypoints=web
+      - traefik.http.routers.medusa-api-http.middlewares=medusa-redirect@docker
       - traefik.http.middlewares.medusa-redirect.redirectscheme.scheme=https
       - traefik.http.middlewares.medusa-redirect.redirectscheme.permanent=true
 
-  # Storefront (Next.js on :8000) - separate hostname
+  # Storefront (Next.js production on :8000) - separate hostname
   storefront:
-    build: .
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY:?Set this in apps/storefront/.env or root .env}
+        NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${NEXT_PUBLIC_MEDUSA_BACKEND_URL:-https://medusa.tracecore.profikid.nl}
+        NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://store.medusa.tracecore.profikid.nl}
+        NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-dk}
     container_name: medusa_storefront
     restart: unless-stopped
     depends_on:
       - medusa
     expose:
       - "8000"
-    environment:
-      - NODE_ENV=development
-      - NEXT_PUBLIC_MEDUSA_BACKEND_URL=https://medusa.tracecore.profikid.nl
-    env_file:
-      - apps/storefront/.env
     volumes:
-      - .:/server
-      - /server/node_modules
-      - /server/apps/backend/node_modules
-      - /server/apps/storefront/node_modules
-    entrypoint: ["./start-storefront.sh"]
+      - ./apps/storefront/.env:/server/apps/storefront/.env:ro
+    entrypoint: ["/server/start-storefront.sh"]
     networks:
       - medusa
       - tracecoreagent_default

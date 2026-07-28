@@ -9,7 +9,8 @@ yarn-error.log*
 .git
 .gitignore
 README.md
-.env.test
+.env
+.env.*
 .nyc_output
 coverage
 .DS_Store
