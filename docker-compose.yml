@@ -28,6 +28,12 @@ services:
 
   # Medusa Server (production: backend + admin on :9000)
   medusa:
+    # `image:` is sed-pinned by .github/workflows/deploy.yml on prod
+    # to ghcr.io/profikid/medusa-store:<sha>. Locally, `docker compose
+    # up --build` falls back to the build: block. `pull_policy: always`
+    # forces a fresh pull on every `up -d` so prod never serves a stale
+    # cached image.
+    image: medusa-store:local
     build:
       context: .
       args:
@@ -35,6 +41,7 @@ services:
         NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${NEXT_PUBLIC_MEDUSA_BACKEND_URL:-https://medusa.tracecore.profikid.nl}
         NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://store.medusa.tracecore.profikid.nl}
         NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-dk}
+    pull_policy: always
     container_name: medusa_backend
     restart: unless-stopped
     depends_on:
@@ -69,6 +76,11 @@ services:
 
   # Storefront (Next.js production on :8000) - separate hostname
   storefront:
+    # Same image as the backend service — the Dockerfile is a
+    # monorepo build that exposes both 9000 and 8000; the entrypoint
+    # chooses which process to start. The container_name still
+    # distinguishes the two. sed-pinned by deploy.yml on prod.
+    image: medusa-store:local
     build:
       context: .
       args:
@@ -76,6 +88,7 @@ services:
         NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${NEXT_PUBLIC_MEDUSA_BACKEND_URL:-https://medusa.tracecore.profikid.nl}
         NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://store.medusa.tracecore.profikid.nl}
         NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-dk}
+    pull_policy: always
     container_name: medusa_storefront
     restart: unless-stopped
     depends_on:
