@@ -38,6 +38,14 @@ COPY . .
 ENV NODE_ENV=production
 RUN pnpm --filter @dtc/backend build
 
+# Workaround for Medusa 2.18 path mismatch: 'medusa build' outputs the admin
+# UI to .medusa/server/public/admin but the runtime loader looks for
+# <rootDirectory>/public/admin/index.html (it joins ADMIN_RELATIVE_OUTPUT_DIR =
+# './public/admin' AFTER spreading the user config, so outDir override doesn't
+# stick). Mirror the build output to public/admin so 'medusa start' finds it.
+RUN mkdir -p /server/apps/backend/public && \
+    cp -r /server/apps/backend/.medusa/server/public/admin /server/apps/backend/public/admin
+
 # Build Next.js storefront (outputs .next/standalone-like structure)
 # Required NEXT_PUBLIC_* envs must be set as build args for check-env-variables
 ARG NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
@@ -78,6 +86,7 @@ COPY --from=builder /server/apps/storefront/node_modules /server/apps/storefront
 COPY --from=builder /server/apps/backend/src ./apps/backend/src
 COPY --from=builder /server/apps/backend/medusa-config.ts ./apps/backend/
 COPY --from=builder /server/apps/backend/tsconfig.json ./apps/backend/
+COPY --from=builder /server/apps/backend/public ./apps/backend/public
 COPY --from=builder /server/apps/storefront/src ./apps/storefront/src
 COPY --from=builder /server/apps/storefront/public ./apps/storefront/public
 COPY --from=builder /server/apps/storefront/next.config.js ./apps/storefront/
