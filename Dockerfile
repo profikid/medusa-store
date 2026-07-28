@@ -50,7 +50,6 @@ COPY --from=builder /server/apps/backend/medusa-config.ts ./apps/backend/medusa-
 COPY --from=builder /server/apps/backend/src ./apps/backend/src
 COPY --from=builder /server/apps/backend/instrumentation.ts ./apps/backend/instrumentation.ts
 COPY --from=builder /server/apps/backend/tsconfig.json ./apps/backend/
-COPY --from=builder /server/apps/backend/tsconfig.tsbuildinfo ./apps/backend/
 
 COPY --from=builder /server/apps/storefront/.next ./apps/storefront/.next
 
