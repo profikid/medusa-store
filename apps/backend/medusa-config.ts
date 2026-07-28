@@ -30,8 +30,8 @@ module.exports = defineConfig({
             'localhost',
             '.localhost',
             '127.0.0.1',
-            'medusa.agent.profikid.nl',
-            'store.medusa.agent.profikid.nl',
+            'medusa.tracecore.profikid.nl',
+            'store.medusa.tracecore.profikid.nl',
           ],
           hmr: {
             // HMR websocket port inside container
@@ -40,7 +40,7 @@ module.exports = defineConfig({
             clientPort: 5173,
             // HMR needs to talk back through Traefik on the same hostname
             protocol: 'wss',
-            clientHost: 'medusa.agent.profikid.nl',
+            clientHost: 'medusa.tracecore.profikid.nl',
           },
         },
       }

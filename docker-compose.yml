@@ -49,13 +49,13 @@ services:
     labels:
       - traefik.enable=true
       # Main public router: backend API + admin dashboard
-      - traefik.http.routers.medusa-storefront.rule=Host(`medusa.agent.profikid.nl`)
+      - traefik.http.routers.medusa-storefront.rule=Host(`medusa.tracecore.profikid.nl`)
       - traefik.http.routers.medusa-storefront.entrypoints=websecure
       - traefik.http.routers.medusa-storefront.tls=true
       - traefik.http.routers.medusa-storefront.tls.certresolver=mytlschallenge
       - traefik.http.services.medusa-storefront.loadbalancer.server.port=9000
       # HTTP → HTTPS redirect
-      - traefik.http.routers.medusa-storefront-http.rule=Host(`medusa.agent.profikid.nl`)
+      - traefik.http.routers.medusa-storefront-http.rule=Host(`medusa.tracecore.profikid.nl`)
       - traefik.http.routers.medusa-storefront-http.entrypoints=web
       - traefik.http.routers.medusa-storefront-http.middlewares=medusa-redirect@docker
       - traefik.http.middlewares.medusa-redirect.redirectscheme.scheme=https
@@ -86,12 +86,12 @@ services:
       - tracecoreagent_default
     labels:
       - traefik.enable=true
-      - traefik.http.routers.medusa-store.rule=Host(`store.medusa.agent.profikid.nl`)
+      - traefik.http.routers.medusa-store.rule=Host(`store.medusa.tracecore.profikid.nl`)
       - traefik.http.routers.medusa-store.entrypoints=websecure
       - traefik.http.routers.medusa-store.tls=true
       - traefik.http.routers.medusa-store.tls.certresolver=mytlschallenge
       - traefik.http.services.medusa-store.loadbalancer.server.port=8000
-      - traefik.http.routers.medusa-store-http.rule=Host(`store.medusa.agent.profikid.nl`)
+      - traefik.http.routers.medusa-store-http.rule=Host(`store.medusa.tracecore.profikid.nl`)
       - traefik.http.routers.medusa-store-http.entrypoints=web
       - traefik.http.routers.medusa-store-http.middlewares=medusa-redirect@docker
 
