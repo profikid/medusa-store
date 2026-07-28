@@ -93,6 +93,12 @@ COPY --from=builder /server/apps/storefront/next.config.js ./apps/storefront/
 COPY --from=builder /server/apps/storefront/tsconfig.json ./apps/storefront/
 COPY --from=builder /server/apps/storefront/check-env-variables.js ./apps/storefront/
 COPY --from=builder /server/apps/storefront/package.json ./apps/storefront/
+# Tailwind + PostCSS configs are needed in the runtime image so any in-container
+# rebuild (e.g. when .next/BUILD_ID is missing) sees them. Without these the
+# generated CSS contains literal `@tailwind base;` directives and the page
+# renders completely unstyled.
+COPY --from=builder /server/apps/storefront/tailwind.config.js ./apps/storefront/
+COPY --from=builder /server/apps/storefront/postcss.config.js ./apps/storefront/
 
 # Copy prebuilt artifacts
 COPY --from=builder /server/apps/backend/.medusa /server/apps/backend/.medusa
