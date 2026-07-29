@@ -287,18 +287,22 @@ jobs:
             HTTP_CODE=""
             for attempt in 1 2 3 4 5; do
               HTTP_CODE="$(curl -sS -o /tmp/smoke.html -w '%{http_code}' "$URL" --max-time 15 || echo 000)"
-              if [ "$HTTP_CODE" = "200" ]; then
+              # 200 OK = page served. 30x = redirect (locale/country),
+              # which means the server is up — Tailwind/Next error
+              # pages would 5xx, so a 3xx is a passing signal. 5xx is
+              # the actual failure mode.
+              if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "301" ] || [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "307" ] || [ "$HTTP_CODE" = "308" ]; then
                 break
               fi
               echo "[smoke] attempt $attempt: HTTP $HTTP_CODE, retrying in 5s..."
               sleep 5
             done
-            if [ "$HTTP_CODE" != "200" ]; then
+            if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "301" ] && [ "$HTTP_CODE" != "302" ] && [ "$HTTP_CODE" != "307" ] && [ "$HTTP_CODE" != "308" ]; then
               echo "[smoke] FAIL: $URL → HTTP $HTTP_CODE after 5 attempts" >&2
               head -20 /tmp/smoke.html >&2 || true
               exit 1
             fi
-            echo "[smoke] OK: $URL → HTTP 200"
+            echo "[smoke] OK: $URL → HTTP $HTTP_CODE"
           done
 
       - name: Verify running image digest matches deployed SHA
