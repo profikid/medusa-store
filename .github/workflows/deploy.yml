@@ -275,14 +275,14 @@ jobs:
         env:
           DEPLOY_SHA: ${{ steps.sha.outputs.sha }}
           STOREFRONT_URL: https://store.medusa.tracecore.profikid.nl
-          ADMIN_URL: https://medusa.tracecore.profikid.nl
+          BACKEND_HEALTH_URL: https://medusa.tracecore.profikid.nl/health
         run: |
           set -euo pipefail
           # Both endpoints can transient 502/503 in the few seconds
           # after `docker compose up -d` when Traefik hasn't yet
           # re-routed to the fresh container. Retry up to 5x with
           # 5s backoff (25s total) before failing.
-          for URL in "$STOREFRONT_URL" "$ADMIN_URL"; do
+          for URL in "$STOREFRONT_URL" "$BACKEND_HEALTH_URL"; do
             echo "[smoke] GET $URL"
             HTTP_CODE=""
             for attempt in 1 2 3 4 5; do
