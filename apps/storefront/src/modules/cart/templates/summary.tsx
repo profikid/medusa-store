@@ -7,6 +7,7 @@ import Divider from "@modules/common/components/divider"
 import DiscountCode from "@modules/checkout/components/discount-code"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { HttpTypes } from "@medusajs/types"
+import posthog from "posthog-js"
 
 type SummaryProps = {
   cart: HttpTypes.StoreCart
@@ -25,6 +26,16 @@ function getCheckoutStep(cart: HttpTypes.StoreCart) {
 const Summary = ({ cart }: SummaryProps) => {
   const step = getCheckoutStep(cart)
 
+  const handleCheckout = () => {
+    posthog.capture("checkout_started", {
+      cart_id: cart.id,
+      cart_total: cart.total,
+      cart_item_count: cart.items?.length ?? 0,
+      currency_code: cart.currency_code,
+      checkout_step: step,
+    })
+  }
+
   return (
     <div className="flex flex-col gap-y-4">
       <Heading level="h2" className="text-[2rem] leading-[2.75rem]">
@@ -36,6 +47,7 @@ const Summary = ({ cart }: SummaryProps) => {
       <LocalizedClientLink
         href={"/checkout?step=" + step}
         data-testid="checkout-button"
+        onClick={handleCheckout}
       >
         <Button className="w-full h-10">Go to checkout</Button>
       </LocalizedClientLink>

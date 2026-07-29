@@ -20,6 +20,8 @@ if (!token) {
     api_host: "/ingest",
     ui_host: "https://eu.posthog.com",
     defaults: "2026-01-30",
+    // Captures unhandled browser exceptions for PostHog error tracking
+    capture_exceptions: true,
     // Cookie-based persistence so the distinct ID survives across
     // navigations. The cookie name is the same one the server uses
     // when generating a fresh ID.
