@@ -141,12 +141,16 @@ jobs:
               fi
             done
 
-            # Idempotent env var sync: ensure the Redis infra-module
-            # URLs are present in apps/backend/.env, mirroring REDIS_URL.
-            # We do this in deploy so adding a new env var in a future
-            # release only requires a code change + a deploy, not a
-            # manual SSH edit on prod. Re-running is safe: only inserts
-            # lines that aren't already present.
+            # Idempotent env var sync. We insert any required env var
+            # if missing. Two categories:
+            #   1) Redis module URLs derived from REDIS_URL.
+            #   2) Notification module placeholders (SENDGRID_API_KEY,
+            #      SENDGRID_FROM) — left empty so the operator can fill
+            #      them in via SSH without redeploying. Removing the
+            #      comment block + the lines = no notification module.
+            # Future modules: add a third loop here. The pattern is
+            # intentionally tiny so anyone reading deploy.yml can
+            # audit "what env vars does this prod install need".
             if [ -f apps/backend/.env ]; then
               REDIS_BASE="$(grep -E '^REDIS_URL=' apps/backend/.env | head -1 | cut -d= -f2-)"
               if [ -z "$REDIS_BASE" ]; then
@@ -162,6 +166,14 @@ jobs:
                   fi
                 done
               fi
+              for k in SENDGRID_API_KEY SENDGRID_FROM; do
+                if grep -qE "^${k}=" apps/backend/.env; then
+                  echo "[deploy] env already set: $k"
+                else
+                  echo "[deploy] env append: $k (empty)"
+                  echo "$k=" >> apps/backend/.env
+                fi
+              done
             fi
 
             # Previous-SHA rollback target, written by the LAST
