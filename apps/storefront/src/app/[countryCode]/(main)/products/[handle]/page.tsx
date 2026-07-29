@@ -4,6 +4,7 @@ import { listProducts } from "@lib/data/products"
 import { getRegion, listRegions } from "@lib/data/regions"
 import ProductTemplate from "@modules/products/templates"
 import { HttpTypes } from "@medusajs/types"
+import { trackStorefrontEvent } from "@lib/posthog-events"
 
 // Skip SSG for product pages — backend unreachable during isolated Docker build
 export const dynamic = "force-dynamic"
@@ -84,6 +85,13 @@ export default async function ProductPage(props: Props) {
   }
 
   const images = getImagesForVariant(pricedProduct, selectedVariantId)
+
+  await trackStorefrontEvent("product_viewed", {
+    product_id: pricedProduct.id,
+    product_handle: pricedProduct.handle,
+    product_title: pricedProduct.title,
+    variant_id: selectedVariantId ?? null,
+  })
 
   return (
     <ProductTemplate
