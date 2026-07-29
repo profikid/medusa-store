@@ -1,24 +1,36 @@
 /**
- * Inject the District X stylesheet into the document head.
- * Idempotent — checks for an existing marker so multiple widgets/routes
- * calling inject don't double-apply.
+ * Inject the District X runtime override sheet into the document head.
  *
- * The CSS is loaded via the side-effect import in
- * widgets/district-x-install.tsx (`import "../globals.css"`). Vite/Rollup
- * picks that up and emits a CSS chunk for the admin bundle, so the
- * stylesheet rides along wherever the topbar widget mounts. This file
- * no longer needs to import the CSS as a string — it's already part of
- * the bundle the moment the topbar widget is loaded.
+ * The static globals.css (with the .dx-* component classes) is bundled
+ * into the admin CSS via Vite's side-effect import in
+ * widgets/district-x-install.tsx. The override sheet, however, has to
+ * load AFTER Medusa's bundled CSS. We can't reorder Vite's chunk order
+ * without a custom plugin, so we inject it as a runtime <style> tag
+ * once the topbar widget mounts.
+ *
+ * Idempotent: tagged with data-dx-override so we don't re-apply.
+ *
+ * The override sheet handles:
+ *   - Re-pointing every Medusa UI variable (--bg-*, --fg-*, --border-*,
+ *     --button-*, --tag-*, etc.) to a --dx-* source-of-truth token.
+ *   - Patching Medusa-internal selectors that don't go through the
+ *     variable plumbing (sidebar, page header, tables, inputs, badges,
+ *     hardcoded tailwind colors).
+ *   - Painting over Medusa's :root { background-color: ... } default.
  */
+import css from "./override.css?raw"
 
-const MARKER = "data-dx-installed"
+const MARKER = "data-dx-override"
 
 export const injectDXStyles = () => {
   if (typeof document === "undefined") {
     return
   }
-  if (document.documentElement.hasAttribute(MARKER)) {
+  if (document.head.querySelector(`style[${MARKER}]`)) {
     return
   }
-  document.documentElement.setAttribute(MARKER, "")
+  const style = document.createElement("style")
+  style.setAttribute(MARKER, "")
+  style.appendChild(document.createTextNode(css))
+  document.head.appendChild(style)
 }

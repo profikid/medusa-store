@@ -1,0 +1,464 @@
+/* ==========================================================================
+   District X — Runtime Override Sheet
+   Injected into the document head via the topbar widget. Loads AFTER
+   Medusa's bundled CSS so it wins the cascade for the variables Medusa
+   declares on :root. ALSO patches a few Medusa-internal classes that
+   don't go through the --bg-* / --fg-* plumbing (e.g. timeline steps,
+   data-table cells, focus rings).
+
+   This file is read as raw text via inject.ts and shipped as a <style>
+   tag with data-dx-override="1" so we can find it again.
+   ========================================================================== */
+
+:root {
+  /* Backgrounds */
+  --bg-base:               var(--dx-bg-1);
+  --bg-base-hover:         var(--dx-bg-2);
+  --bg-base-pressed:       var(--dx-bg-3);
+  --bg-subtle:             var(--dx-bg-1);
+  --bg-subtle-hover:       var(--dx-bg-2);
+  --bg-subtle-pressed:     var(--dx-bg-3);
+  --bg-component:          var(--dx-bg-2);
+  --bg-component-hover:    var(--dx-bg-3);
+  --bg-component-pressed:  var(--dx-bg-3);
+  --bg-field:              var(--dx-bg-2);
+  --bg-field-hover:        var(--dx-bg-3);
+  --bg-field-component:    var(--dx-bg-2);
+  --bg-field-component-hover: var(--dx-bg-3);
+  --bg-interactive:        var(--dx-amber-300);
+  --bg-highlight:          rgba(232, 154, 31, 0.14);
+  --bg-highlight-hover:    rgba(232, 154, 31, 0.20);
+  --bg-disabled:           var(--dx-bg-3);
+  --bg-overlay:            rgba(0, 0, 0, 0.70);
+  --bg-switch-off:         var(--dx-bg-3);
+  --bg-switch-off-hover:   var(--dx-bg-2);
+
+  /* Foregrounds */
+  --fg-base:               var(--dx-text-100);
+  --fg-subtle:             var(--dx-text-60);
+  --fg-muted:              var(--dx-text-40);
+  --fg-disabled:           var(--dx-text-20);
+  --fg-error:              var(--dx-rose);
+  --fg-interactive:        var(--dx-amber-300);
+  --fg-interactive-hover:  var(--dx-amber-200);
+  --fg-on-color:           var(--dx-bg-1);
+  --fg-on-inverted:        var(--dx-text-100);
+
+  /* Borders */
+  --border-base:           var(--dx-border);
+  --border-strong:         var(--dx-border-strong);
+  --border-interactive:    var(--dx-amber-300);
+  --border-danger:         var(--dx-rose);
+  --border-error:          var(--dx-rose);
+  --border-menu-top:       var(--dx-border);
+  --border-menu-bot:       var(--dx-border);
+  --border-transparent:    transparent;
+  --borders-base:          var(--dx-border);
+  --borders-error:         var(--dx-rose);
+  --borders-focus:         var(--dx-amber-300);
+  --borders-interactive-with-active: var(--dx-amber-300);
+  --borders-interactive-with-shadow: var(--dx-amber-glow);
+
+  /* Buttons */
+  --button-neutral:        var(--dx-bg-2);
+  --button-neutral-hover:  var(--dx-bg-3);
+  --button-neutral-pressed: var(--dx-bg-3);
+  --button-inverted:       var(--dx-amber-300);
+  --button-inverted-hover: var(--dx-amber-200);
+  --button-inverted-pressed: var(--dx-amber-400);
+  --button-danger:         var(--dx-rose);
+  --button-danger-hover:   #B73B3B;
+  --button-danger-pressed: #A33333;
+  --button-transparent:    transparent;
+  --button-transparent-hover: var(--dx-bg-2);
+  --button-transparent-pressed: var(--dx-bg-3);
+  --buttons-neutral:       var(--dx-bg-2);
+
+  /* Contrast surfaces (popovers, code blocks) */
+  --contrast-bg-base:      var(--dx-bg-2);
+  --contrast-bg-base-hover: var(--dx-bg-3);
+  --contrast-bg-base-pressed: var(--dx-bg-3);
+  --contrast-bg-subtle:    var(--dx-bg-1);
+  --contrast-border-base:  var(--dx-border-strong);
+  --contrast-border-bot:   var(--dx-border);
+  --contrast-border-top:   var(--dx-border);
+  --contrast-fg-primary:   var(--dx-text-100);
+  --contrast-fg-secondary: var(--dx-text-60);
+  --details-contrast-on-bg-interactive: var(--dx-bg-1);
+  --elevation-code-block:  var(--dx-shadow-2);
+
+  /* Tags */
+  --tag-neutral-bg:        var(--dx-bg-2);
+  --tag-neutral-bg-hover:  var(--dx-bg-3);
+  --tag-neutral-border:    var(--dx-border);
+  --tag-neutral-icon:      var(--dx-text-60);
+  --tag-neutral-text:      var(--dx-text-80);
+
+  --tag-blue-bg:           rgba(46, 120, 210, 0.14);
+  --tag-blue-bg-hover:     rgba(46, 120, 210, 0.20);
+  --tag-blue-border:       rgba(46, 120, 210, 0.35);
+  --tag-blue-icon:         var(--dx-cobalt);
+  --tag-blue-text:         #6FA9F0;
+
+  --tag-red-bg:            rgba(210, 69, 69, 0.14);
+  --tag-red-bg-hover:      rgba(210, 69, 69, 0.20);
+  --tag-red-border:        rgba(210, 69, 69, 0.35);
+  --tag-red-icon:          var(--dx-rose);
+  --tag-red-text:          #E57070;
+
+  --tag-orange-bg:         rgba(232, 154, 31, 0.14);
+  --tag-orange-bg-hover:   rgba(232, 154, 31, 0.20);
+  --tag-orange-border:     rgba(232, 154, 31, 0.35);
+  --tag-orange-icon:       var(--dx-amber-300);
+  --tag-orange-text:       var(--dx-amber-200);
+
+  --tag-green-bg:          rgba(46, 166, 111, 0.14);
+  --tag-green-bg-hover:    rgba(46, 166, 111, 0.20);
+  --tag-green-border:      rgba(46, 166, 111, 0.35);
+  --tag-green-icon:        var(--dx-emerald);
+  --tag-green-text:        #5BC788;
+
+  --tag-purple-bg:         rgba(168, 85, 247, 0.14);
+  --tag-purple-bg-hover:   rgba(168, 85, 247, 0.20);
+  --tag-purple-border:     rgba(168, 85, 247, 0.35);
+  --tag-purple-icon:       #A855F7;
+  --tag-purple-text:       #C084FC;
+}
+
+/* ==========================================================================
+   Hard overrides for Medusa-internal selectors that don't go through
+   the --bg-* / --fg-* plumbing. These are the "white surface" crimes
+   that scored your screenshot.
+   ========================================================================== */
+
+/* Medusa's default :root sets background-color on :root itself, layered
+   over the html — paint over it. */
+:root {
+  background-color: var(--dx-bg-0) !important;
+  color: var(--dx-text-100) !important;
+}
+
+/* Drop the inset radial-gradient Medusa paints on the page wrapper. */
+#app, .app-container, [data-app] {
+  background-color: var(--dx-bg-0) !important;
+}
+
+/* === SIDEBAR === */
+nav[class*="bg-ui-bg-base"],
+aside[class*="bg-ui-bg-base"],
+aside[class*="bg-ui-bg-subtle"] {
+  background-color: var(--dx-bg-1) !important;
+  border-color: var(--dx-border) !important;
+  color: var(--dx-text-100) !important;
+}
+nav[class*="bg-ui-bg-base"] a,
+aside[class*="bg-ui-bg-base"] a {
+  color: var(--dx-text-60) !important;
+}
+nav[class*="bg-ui-bg-base"] a[class*="bg-ui-bg-interactive"],
+aside[class*="bg-ui-bg-base"] a[class*="bg-ui-bg-interactive"] {
+  background-color: var(--dx-amber-glow) !important;
+  color: var(--dx-text-100) !important;
+  border-left: 2px solid var(--dx-amber-300) !important;
+}
+nav[class*="bg-ui-bg-base"] a:hover,
+aside[class*="bg-ui-bg-base"] a:hover {
+  background-color: var(--dx-bg-2) !important;
+  color: var(--dx-text-100) !important;
+}
+
+/* === MAIN CONTENT WRAPPER === */
+main, [data-role="main"], [class*="min-h-screen"] {
+  background-color: var(--dx-bg-0) !important;
+  color: var(--dx-text-100) !important;
+}
+
+/* === PAGE HEADER === */
+[class*="bg-ui-bg-subtle"][class*="border-b"],
+[class*="bg-ui-bg-base"][class*="border-b"] {
+  background-color: var(--dx-bg-1) !important;
+  border-color: var(--dx-border) !important;
+}
+
+/* === CARDS / CONTAINERS / SURFACES === */
+[class*="bg-ui-bg-base"] {
+  background-color: var(--dx-bg-1) !important;
+}
+[class*="bg-ui-bg-subtle"] {
+  background-color: var(--dx-bg-1) !important;
+}
+[class*="bg-ui-bg-component"] {
+  background-color: var(--dx-bg-2) !important;
+}
+[class*="bg-ui-bg-field"] {
+  background-color: var(--dx-bg-2) !important;
+}
+[class*="bg-ui-bg-disabled"] {
+  background-color: var(--dx-bg-3) !important;
+}
+[class*="bg-ui-bg-overlay"] {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+/* === TYPOGRAPHY === */
+[class*="text-ui-fg-base"] {
+  color: var(--dx-text-100) !important;
+}
+[class*="text-ui-fg-subtle"] {
+  color: var(--dx-text-60) !important;
+}
+[class*="text-ui-fg-muted"] {
+  color: var(--dx-text-40) !important;
+}
+[class*="text-ui-fg-interactive"] {
+  color: var(--dx-amber-300) !important;
+}
+[class*="text-ui-fg-error"] {
+  color: var(--dx-rose) !important;
+}
+[class*="text-ui-fg-disabled"] {
+  color: var(--dx-text-20) !important;
+}
+
+/* === BORDERS === */
+[class*="border-ui-border-base"] {
+  border-color: var(--dx-border) !important;
+}
+[class*="border-ui-border-strong"] {
+  border-color: var(--dx-border-strong) !important;
+}
+[class*="border-ui-border-error"] {
+  border-color: var(--dx-rose) !important;
+}
+
+/* === BUTTONS === */
+button[class*="bg-ui-button-inverted"],
+a[class*="bg-ui-button-inverted"] {
+  background-color: var(--dx-amber-300) !important;
+  color: var(--dx-bg-1) !important;
+}
+button[class*="bg-ui-button-inverted"]:hover,
+a[class*="bg-ui-button-inverted"]:hover {
+  background-color: var(--dx-amber-200) !important;
+}
+button[class*="bg-ui-button-neutral"],
+a[class*="bg-ui-button-neutral"] {
+  background-color: var(--dx-bg-2) !important;
+  color: var(--dx-text-100) !important;
+  border-color: var(--dx-border-strong) !important;
+}
+button[class*="bg-ui-button-neutral"]:hover,
+a[class*="bg-ui-button-neutral"]:hover {
+  background-color: var(--dx-bg-3) !important;
+  border-color: var(--dx-amber-300) !important;
+}
+button[class*="bg-ui-button-danger"],
+a[class*="bg-ui-button-danger"] {
+  background-color: var(--dx-rose) !important;
+  color: var(--dx-text-100) !important;
+}
+button[class*="bg-ui-button-transparent"],
+a[class*="bg-ui-button-transparent"] {
+  background-color: transparent !important;
+  color: var(--dx-text-100) !important;
+}
+button[class*="bg-ui-button-transparent"]:hover,
+a[class*="bg-ui-button-transparent"]:hover {
+  background-color: var(--dx-bg-2) !important;
+}
+
+/* === TABLES === */
+table, [data-role="data-table"], [role="table"] {
+  background-color: var(--dx-bg-1) !important;
+  color: var(--dx-text-100) !important;
+  border-color: var(--dx-border) !important;
+}
+table thead, [data-role="data-table"] thead, [role="table"] thead,
+table [data-role="row"], [data-role="data-table"] [data-role="row"] {
+  background-color: var(--dx-bg-1) !important;
+  border-color: var(--dx-border) !important;
+}
+table tbody, [data-role="data-table"] tbody, [role="table"] tbody {
+  background-color: transparent !important;
+}
+table th, [data-role="data-table"] th, [role="table"] th,
+table [data-role="columnheader"], [data-role="data-table"] [data-role="columnheader"] {
+  background-color: var(--dx-bg-1) !important;
+  color: var(--dx-text-60) !important;
+  border-bottom: 1px solid var(--dx-border) !important;
+  font-family: var(--dx-font-mono) !important;
+  font-size: 11px !important;
+  letter-spacing: 1.5px !important;
+  text-transform: uppercase !important;
+  font-weight: 600 !important;
+}
+table td, [data-role="data-table"] td, [role="table"] td,
+table [data-role="cell"], [data-role="data-table"] [data-role="cell"] {
+  background-color: transparent !important;
+  color: var(--dx-text-80) !important;
+  border-bottom: 1px solid var(--dx-border) !important;
+}
+table tr:hover td, [data-role="data-table"] tr:hover td,
+table [data-role="row"]:hover td,
+[data-role="data-table"] [data-role="row"]:hover td {
+  background-color: var(--dx-bg-2) !important;
+}
+table tr:hover [data-role="cell"],
+[data-role="data-table"] tr:hover [data-role="cell"] {
+  background-color: var(--dx-bg-2) !important;
+}
+
+/* === HOVER ROW HIGHLIGHT === */
+.group\/row:hover .group-data-\[selected\=true\]\/row\:bg-ui-bg-highlight,
+.group\/row[data-selected=true]:hover {
+  background-color: var(--dx-amber-glow) !important;
+}
+
+/* === STATUS BADGES (Done, Reverted, etc.) === */
+span[class*="bg-ui-tag-green-bg"] {
+  background-color: rgba(46, 166, 111, 0.14) !important;
+  color: #5BC788 !important;
+  border-color: rgba(46, 166, 111, 0.35) !important;
+}
+span[class*="bg-ui-tag-red-bg"] {
+  background-color: rgba(210, 69, 69, 0.14) !important;
+  color: #E57070 !important;
+  border-color: rgba(210, 69, 69, 0.35) !important;
+}
+span[class*="bg-ui-tag-orange-bg"] {
+  background-color: rgba(232, 154, 31, 0.14) !important;
+  color: var(--dx-amber-200) !important;
+  border-color: rgba(232, 154, 31, 0.35) !important;
+}
+span[class*="bg-ui-tag-blue-bg"] {
+  background-color: rgba(46, 120, 210, 0.14) !important;
+  color: #6FA9F0 !important;
+  border-color: rgba(46, 120, 210, 0.35) !important;
+}
+span[class*="bg-ui-tag-purple-bg"] {
+  background-color: rgba(168, 85, 247, 0.14) !important;
+  color: #C084FC !important;
+  border-color: rgba(168, 85, 247, 0.35) !important;
+}
+span[class*="bg-ui-tag-neutral-bg"] {
+  background-color: var(--dx-bg-2) !important;
+  color: var(--dx-text-80) !important;
+  border-color: var(--dx-border) !important;
+}
+
+/* === INPUTS === */
+input[class*="bg-ui-bg-field"],
+input[class*="bg-ui-bg-base"],
+textarea[class*="bg-ui-bg-field"],
+textarea[class*="bg-ui-bg-base"],
+select[class*="bg-ui-bg-field"],
+select[class*="bg-ui-bg-base"] {
+  background-color: var(--dx-bg-2) !important;
+  color: var(--dx-text-100) !important;
+  border-color: var(--dx-border-strong) !important;
+}
+input[class*="bg-ui-bg-field"]:focus,
+textarea[class*="bg-ui-bg-field"]:focus,
+select[class*="bg-ui-bg-field"]:focus {
+  border-color: var(--dx-amber-300) !important;
+  box-shadow: 0 0 0 3px var(--dx-amber-glow) !important;
+  outline: none !important;
+}
+
+/* === COMMAND MENU / POPOVERS === */
+[cmdk-root], [cmdk-input], [role="dialog"], [role="menu"] {
+  background-color: var(--dx-bg-2) !important;
+  color: var(--dx-text-100) !important;
+  border-color: var(--dx-border-strong) !important;
+}
+
+/* === CODE / MONO === */
+code, pre, kbd, samp {
+  font-family: var(--dx-font-mono) !important;
+  color: var(--dx-amber-200) !important;
+}
+
+/* === HARDCODED TAILWIND COLORS MEDUSA LEAKS === */
+.bg-gray-2, .bg-gray-200, .bg-white {
+  background-color: var(--dx-bg-2) !important;
+}
+.bg-\[\#3B82F6\] {
+  background-color: var(--dx-amber-300) !important;
+}
+.bg-black\/30, .bg-black\/50 {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+}
+.text-gray-100, .text-gray-200, .text-gray-300 {
+  color: var(--dx-text-100) !important;
+}
+.text-gray-400, .text-gray-500 {
+  color: var(--dx-text-60) !important;
+}
+.text-gray-600 {
+  color: var(--dx-text-40) !important;
+}
+.text-blue-400, .text-blue-500 {
+  color: var(--dx-amber-300) !important;
+}
+.text-red-400, .text-red-500 {
+  color: var(--dx-rose) !important;
+}
+.text-green-400, .text-green-500 {
+  color: var(--dx-emerald) !important;
+}
+.divide-ui-border-base > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--dx-border) !important;
+}
+
+/* === MEDUSA FOCUS RINGS — turn amber === */
+[class*="shadow-borders-interactive-with-shadow"] {
+  --tw-shadow-color: var(--dx-amber-glow) !important;
+}
+
+/* === STATUS DOT INSIDE TAGS === */
+span[class*="bg-ui-tag-"] svg circle,
+span[class*="bg-ui-tag-"] [class*="bg-ui-tag-"] {
+  fill: currentColor !important;
+}
+
+/* === DIVIDERS === */
+hr, [class*="border-ui-border-base"] {
+  border-color: var(--dx-border) !important;
+}
+
+/* === BREADCRUMB HEADER === */
+nav[class*="bg-ui-bg-base"] ol a,
+[class*="text-ui-fg-muted"] a {
+  color: var(--dx-text-60) !important;
+}
+nav[class*="bg-ui-bg-base"] ol a:hover,
+[class*="text-ui-fg-muted"] a:hover {
+  color: var(--dx-amber-300) !important;
+}
+
+/* === FILTERS / SEARCH INPUT TOP === */
+[class*="bg-ui-bg-component"] input,
+[class*="bg-ui-bg-base"] input[type="search"] {
+  background-color: var(--dx-bg-2) !important;
+  border-color: var(--dx-border-strong) !important;
+  color: var(--dx-text-100) !important;
+}
+input::placeholder, textarea::placeholder {
+  color: var(--dx-text-40) !important;
+}
+
+/* === PAGINATION === */
+button[class*="bg-ui-button-transparent"][disabled] {
+  color: var(--dx-text-20) !important;
+}
+
+/* === TIMELINE / STEP NODES (workflows page) === */
+[class*="bg-ui-bg-switch-off"] {
+  background-color: var(--dx-bg-3) !important;
+}
+
+/* === MEDUSA'S DEFAULT HARD-CODED BG === */
+.bg-\[rgb\(255\2c 255\2c 255\)\],
+.bg-\[white\] {
+  background-color: var(--dx-bg-1) !important;
+}
