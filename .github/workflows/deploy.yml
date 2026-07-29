@@ -13,14 +13,20 @@ name: Deploy
 #     the SHA we just deployed. HTTP 200 alone is not a deploy proof.
 #
 # Repo secrets (this workflow):
-#   PROD_SSH_KEY  — RSA-4096 PEM format. Do NOT use ed25519/OpenSSH
-#                   format: GHA secrets storage can silently mangle
-#                   them (libcrypto parse error at ssh-keygen).
-#   PROD_HOST     — "root@<host>" form (e.g. "root@tracecore.profikid.nl")
-#   GHCR_TOKEN    — fine-grained PAT with `read:packages` scope on
-#                   profikid/medusa-store. Used by prod `docker pull`.
-#                   Operator's personal gh CLI token is over-scoped;
-#                   mint a dedicated one.
+#   PROD_SSH_KEY           — RSA-4096 PEM format. Do NOT use ed25519/OpenSSH
+#                            format: GHA secrets storage can silently mangle
+#                            them (libcrypto parse error at ssh-keygen).
+#   PROD_HOST              — "root@<host>" form (e.g. "root@tracecore.profikid.nl")
+#   GHCR_TOKEN             — fine-grained PAT with `read:packages` scope on
+#                            profikid/medusa-store. Used by prod `docker pull`.
+#                            Operator's personal gh CLI token is over-scoped;
+#                            mint a dedicated one.
+#   POSTHOG_EVENTS_API_KEY — PostHog project API key (`phc_...`). Synced
+#                            into apps/backend/.env so the analytics-posthog
+#                            provider activates at runtime. Public project
+#                            key, not a personal API key.
+#   POSTHOG_HOST           — PostHog ingestion host. Synced to .env alongside
+#                            the key. Defaults to eu.i.posthog.com.
 #
 # One-time prod bootstrap:
 #   On prod, `docker login ghcr.io -u <owner>` with GHCR_TOKEN. This
@@ -96,18 +102,22 @@ jobs:
           DEPLOY_SHA: ${{ steps.sha.outputs.sha }}
           IMAGE_REPO: profikid/medusa-store
           IMAGE: ghcr.io/profikid/medusa-store
+          POSTHOG_EVENTS_API_KEY: ${{ secrets.POSTHOG_EVENTS_API_KEY }}
+          POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
         run: |
           set -euo pipefail
           ssh -i ~/.ssh/id_ed25519 \
               -o StrictHostKeyChecking=accept-new \
               -o UserKnownHostsFile=~/.ssh/known_hosts \
               "$PROD_HOST" \
-              bash -s -- "$DEPLOY_SHA" "$IMAGE" "$IMAGE_REPO" "$GHCR_TOKEN" <<'REMOTE'
+              bash -s -- "$DEPLOY_SHA" "$IMAGE" "$IMAGE_REPO" "$GHCR_TOKEN" "$POSTHOG_EVENTS_API_KEY" "$POSTHOG_HOST" <<'REMOTE'
             set -euo pipefail
             DEPLOY_SHA="$1"
             IMAGE="$2"
             IMAGE_REPO="$3"
             GHCR_TOKEN="$4"
+            POSTHOG_EVENTS_API_KEY="$5"
+            POSTHOG_HOST="$6"
             PROD_DIR="/docker/medusa"
 
             cd "$PROD_DIR"
@@ -174,6 +184,46 @@ jobs:
                   echo "$k=" >> apps/backend/.env
                 fi
               done
+
+              # PostHog analytics — backend provider. Unlike SendGrid
+              # (which is left empty for the operator to fill by hand),
+              # PostHog values are pushed from GHA secrets so events
+              # hit the dashboard without a manual SSH step. If a
+              # secret is missing on a given deploy, we fall back to
+              # the empty-default path and the provider stays at
+              # analytics-local (same graceful degradation as before).
+              if [ -n "${POSTHOG_EVENTS_API_KEY:-}" ]; then
+                if grep -qE '^POSTHOG_EVENTS_API_KEY=' apps/backend/.env; then
+                  if grep -qE "^POSTHOG_EVENTS_API_KEY=${POSTHOG_EVENTS_API_KEY}$" apps/backend/.env; then
+                    echo "[deploy] env already set: POSTHOG_EVENTS_API_KEY"
+                  else
+                    echo "[deploy] env update: POSTHOG_EVENTS_API_KEY"
+                    sed -i.bak -E "s|^POSTHOG_EVENTS_API_KEY=.*|POSTHOG_EVENTS_API_KEY=${POSTHOG_EVENTS_API_KEY}|" apps/backend/.env
+                    rm -f apps/backend/.env.bak
+                  fi
+                else
+                  echo "[deploy] env append: POSTHOG_EVENTS_API_KEY"
+                  echo "POSTHOG_EVENTS_API_KEY=${POSTHOG_EVENTS_API_KEY}" >> apps/backend/.env
+                fi
+              else
+                echo "[deploy] WARN: POSTHOG_EVENTS_API_KEY secret not set; backend stays on analytics-local" >&2
+              fi
+              if [ -n "${POSTHOG_HOST:-}" ]; then
+                if grep -qE '^POSTHOG_HOST=' apps/backend/.env; then
+                  if grep -qE "^POSTHOG_HOST=${POSTHOG_HOST}$" apps/backend/.env; then
+                    echo "[deploy] env already set: POSTHOG_HOST"
+                  else
+                    echo "[deploy] env update: POSTHOG_HOST"
+                    sed -i.bak -E "s|^POSTHOG_HOST=.*|POSTHOG_HOST=${POSTHOG_HOST}|" apps/backend/.env
+                    rm -f apps/backend/.env.bak
+                  fi
+                else
+                  echo "[deploy] env append: POSTHOG_HOST"
+                  echo "POSTHOG_HOST=${POSTHOG_HOST}" >> apps/backend/.env
+                fi
+              else
+                echo "[deploy] WARN: POSTHOG_HOST secret not set; backend uses Medusa provider default" >&2
+              fi
             fi
 
             # Previous-SHA rollback target, written by the LAST
