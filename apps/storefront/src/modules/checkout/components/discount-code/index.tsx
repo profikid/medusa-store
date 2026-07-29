@@ -1,6 +1,13 @@
 "use client"
 
-import { Badge, Heading, Input, Label, Text } from "@modules/common/components/ui"
+import posthog from "posthog-js"
+import {
+  Badge,
+  Heading,
+  Input,
+  Label,
+  Text,
+} from "@modules/common/components/ui"
 import React from "react"
 
 import { applyPromotions } from "@lib/data/cart"
@@ -27,6 +34,11 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
     await applyPromotions(
       validPromotions.filter((p) => p.code !== undefined).map((p) => p.code!)
     )
+
+    posthog.capture("discount_code_removed", {
+      code,
+      cart_id: cart.id,
+    })
   }
 
   const addPromotionCode = async (formData: FormData) => {
@@ -44,6 +56,10 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
 
     try {
       await applyPromotions(codes)
+      posthog.capture("discount_code_applied", {
+        code: code.toString(),
+        cart_id: cart.id,
+      })
     } catch (e) {
       setErrorMessage(e instanceof Error ? e.message : String(e))
     }

@@ -1,5 +1,6 @@
 import { Heading } from "@modules/common/components/ui"
 import { cookies as nextCookies } from "next/headers"
+import { getPostHogClient } from "@lib/posthog-server"
 
 import CartTotals from "@modules/common/components/cart-totals"
 import Help from "@modules/order/components/help"
@@ -20,6 +21,21 @@ export default async function OrderCompletedTemplate({
   const cookies = await nextCookies()
 
   const isOnboarding = cookies.get("_medusa_onboarding")?.value === "true"
+
+  const posthog = getPostHogClient()
+  if (posthog) {
+    posthog.capture({
+      distinctId: order.email ?? order.id,
+      event: "order_confirmed_viewed",
+      properties: {
+        order_id: order.id,
+        display_id: order.display_id,
+        total: order.total,
+        currency_code: order.currency_code,
+      },
+    })
+    await posthog.flush()
+  }
 
   return (
     <div className="py-6 min-h-[calc(100vh-64px)]">

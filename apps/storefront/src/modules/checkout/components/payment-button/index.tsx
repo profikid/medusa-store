@@ -1,5 +1,6 @@
 "use client"
 
+import posthog from "posthog-js"
 import { isManual, isStripeLike } from "@lib/constants"
 import { placeOrder } from "@lib/data/cart"
 import { HttpTypes } from "@medusajs/types"
@@ -84,6 +85,13 @@ const StripePaymentButton = ({
       return
     }
 
+    posthog.capture("payment_initiated", {
+      cart_id: cart.id,
+      payment_provider: "stripe",
+      total: cart.total,
+      currency_code: cart.currency_code,
+    })
+
     await stripe
       .confirmCardPayment(session?.data.client_secret as string, {
         payment_method: {
@@ -167,6 +175,10 @@ const ManualTestPaymentButton = ({ notReady }: { notReady: boolean }) => {
 
   const handlePayment = () => {
     setSubmitting(true)
+
+    posthog.capture("payment_initiated", {
+      payment_provider: "manual",
+    })
 
     onPaymentCompleted()
   }

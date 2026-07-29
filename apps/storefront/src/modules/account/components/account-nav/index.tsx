@@ -1,5 +1,6 @@
 "use client"
 
+import posthog from "posthog-js"
 import { ArrowRightOnRectangle } from "@medusajs/icons"
 import { clx } from "@modules/common/components/ui"
 import { useParams, usePathname } from "next/navigation"
@@ -21,6 +22,7 @@ const AccountNav = ({
   const { countryCode } = useParams() as { countryCode: string }
 
   const handleLogout = async () => {
+    posthog.reset()
     await signout(countryCode)
   }
 

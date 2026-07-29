@@ -1,5 +1,6 @@
 "use client"
 
+import posthog from "posthog-js"
 import { addToCart } from "@lib/data/cart"
 import { useIntersection } from "@lib/hooks/use-in-view"
 import { HttpTypes } from "@medusajs/types"
@@ -130,6 +131,14 @@ export default function ProductActions({
       variantId: selectedVariant.id,
       quantity: 1,
       countryCode,
+    })
+
+    posthog.capture("product_added_to_cart", {
+      product_id: product.id,
+      product_handle: product.handle,
+      variant_id: selectedVariant.id,
+      variant_title: selectedVariant.title,
+      quantity: 1,
     })
 
     setIsAdding(false)

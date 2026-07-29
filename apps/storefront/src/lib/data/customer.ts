@@ -1,5 +1,6 @@
 "use server"
 
+import { getPostHogClient } from "@lib/posthog-server"
 import { sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
 import { HttpTypes } from "@medusajs/types"
@@ -121,7 +122,21 @@ export async function signup(
 
   // Continue by logging in. The login response tells us whether the backend
   // requires email verification — we don't need a storefront-side flag.
-  return completeLogin(customerForm.email, password)
+  const result = await completeLogin(customerForm.email, password)
+
+  if (result?.state === "success") {
+    const posthog = getPostHogClient()
+    if (posthog) {
+      posthog.capture({
+        distinctId: customerForm.email,
+        event: "user_signed_up",
+        properties: { source: "storefront" },
+      })
+      await posthog.flush()
+    }
+  }
+
+  return result
 }
 
 export async function login(
@@ -131,7 +146,25 @@ export async function login(
   const email = formData.get("email") as string
   const password = formData.get("password") as string
 
-  return completeLogin(email, password)
+  const result = await completeLogin(email, password)
+
+  if (result?.state === "success") {
+    const posthog = getPostHogClient()
+    if (posthog) {
+      posthog.capture({
+        distinctId: email,
+        event: "user_logged_in",
+        properties: { source: "storefront" },
+      })
+      posthog.identify({
+        distinctId: email,
+        properties: { email },
+      })
+      await posthog.flush()
+    }
+  }
+
+  return result
 }
 
 // Logs the customer in and reconciles the customer record. The behavior is
@@ -248,7 +281,21 @@ export async function confirmEmailVerification(
 }
 
 export async function signout(countryCode: string) {
+  const customer = await retrieveCustomer().catch(() => null)
+
   await sdk.auth.logout()
+
+  if (customer?.email) {
+    const posthog = getPostHogClient()
+    if (posthog) {
+      posthog.capture({
+        distinctId: customer.email,
+        event: "user_signed_out",
+        properties: { source: "storefront" },
+      })
+      await posthog.flush()
+    }
+  }
 
   await removeAuthToken()
 

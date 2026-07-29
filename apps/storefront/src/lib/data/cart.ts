@@ -1,5 +1,6 @@
 "use server"
 
+import { getPostHogClient } from "@lib/posthog-server"
 import { sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
 import { HttpTypes } from "@medusajs/types"
@@ -417,6 +418,23 @@ export async function placeOrder(cartId?: string) {
 
     const orderCacheTag = await getCacheTag("orders")
     revalidateTag(orderCacheTag)
+
+    const posthog = getPostHogClient()
+    if (posthog) {
+      posthog.capture({
+        distinctId: cartRes.order.email ?? cartRes.order.id,
+        event: "order_placed",
+        properties: {
+          order_id: cartRes.order.id,
+          display_id: cartRes.order.display_id,
+          total: cartRes.order.total,
+          currency_code: cartRes.order.currency_code,
+          item_count: cartRes.order.items?.length ?? 0,
+          country_code: countryCode,
+        },
+      })
+      await posthog.flush()
+    }
 
     removeCartId()
     redirect(`/${countryCode}/order/${cartRes?.order.id}/confirmed`)
