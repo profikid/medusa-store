@@ -124,19 +124,45 @@ module.exports = defineConfig({
       },
     },
     {
-      // Analytics Module — Local provider. Logs events to backend
-      // console at debug level. Set LOG_LEVEL=debug in the env to see
-      // events. Only one analytics provider per app; PostHog/Segment
-      // can be swapped in by replacing the provider URI when needed.
+      // Analytics Module — PostHog provider (server-side commerce
+      // events). The frontend SDK is initialised in
+      // apps/storefront/instrumentation-client.ts and shares the
+      // same project token, so server events (order.placed,
+      // order.canceled, payment.captured/refunded) and browser
+      // events land under the same PostHog project. The storefront
+      // persists a PostHog distinct ID on every cart via
+      // cart.metadata.posthog_distinct_id; the completeCartWorkflow
+      // copies cart metadata to the order, so backend subscribers
+      // resolve the same actor for refunds and cancellations as
+      // they did for the original order. POSTHOG_EVENTS_API_KEY
+      // must be the *events/project* key, not a personal API key.
+      //
+      // Dev fallback: if no key is configured, we register the
+      // in-memory Local provider so the backend still boots and the
+      // existing analytics subscriber code path can be exercised
+      // (events log at debug level). The Subscriber list is
+      // identical between providers, so swapping providers does
+      // not require any code changes in subscribers.
       // Resolves to Modules.ANALYTICS in the container.
       resolve: '@medusajs/medusa/analytics',
       options: {
-        providers: [
-          {
-            resolve: '@medusajs/analytics-local',
-            id: 'local',
-          },
-        ],
+        providers: process.env.POSTHOG_EVENTS_API_KEY
+          ? [
+              {
+                resolve: '@medusajs/analytics-posthog',
+                id: 'posthog',
+                options: {
+                  posthogHost: process.env.POSTHOG_HOST,
+                  posthogEventsKey: process.env.POSTHOG_EVENTS_API_KEY,
+                },
+              },
+            ]
+          : [
+              {
+                resolve: '@medusajs/analytics-local',
+                id: 'local',
+              },
+            ],
       },
     },
     {

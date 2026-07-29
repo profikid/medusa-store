@@ -1,5 +1,6 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
+import { resolvePostHogActorId } from "../lib/posthog-actor"
 
 // Order payload shape as emitted on `order.created`. We only declare the
 // fields we actually read; the full type is `OrderDTO` from `@medusajs/types`
@@ -10,6 +11,7 @@ type OrderEventPayload = {
   display_id?: string | null
   currency_code?: string | null
   total?: number | null
+  metadata?: Record<string, unknown> | null
   items?: Array<{ title?: string; quantity?: number }> | null
 }
 
@@ -70,6 +72,7 @@ export default async function orderConfirmationHandler({
       "display_id",
       "currency_code",
       "total",
+      "metadata",
       "items.title",
       "items.quantity",
     ],
@@ -90,19 +93,24 @@ export default async function orderConfirmationHandler({
   }
 
   // Analytics — track the event so we can chart conversions later.
-  // The Local provider logs this at debug level; PostHog/Segment can be
-  // swapped in without touching this code.
+  // The PostHog provider routes via Modules.ANALYTICS; actor_id is
+  // resolved from the cart-derived metadata so storefront sessions
+  // and this server-side event line up under the same PostHog person.
   try {
     const analytics = container.resolve(Modules.ANALYTICS) as {
       track: (event: {
         event: string
-        user_id?: string
+        actor_id?: string
         properties?: Record<string, unknown>
       }) => Promise<void> | void
     }
+    const actorId = resolvePostHogActorId({
+      metadata: order.metadata,
+      email: order.email,
+    })
     await analytics.track({
       event: "order.placed",
-      user_id: order.email,
+      actor_id: actorId ?? undefined,
       properties: {
         order_id: order.id,
         display_id: order.display_id,
