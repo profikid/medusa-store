@@ -230,11 +230,23 @@ jobs:
           ADMIN_URL: https://medusa.tracecore.profikid.nl
         run: |
           set -euo pipefail
+          # Both endpoints can transient 502/503 in the few seconds
+          # after `docker compose up -d` when Traefik hasn't yet
+          # re-routed to the fresh container. Retry up to 5x with
+          # 5s backoff (25s total) before failing.
           for URL in "$STOREFRONT_URL" "$ADMIN_URL"; do
             echo "[smoke] GET $URL"
-            HTTP_CODE="$(curl -sS -o /tmp/smoke.html -w '%{http_code}' "$URL" --max-time 30)"
+            HTTP_CODE=""
+            for attempt in 1 2 3 4 5; do
+              HTTP_CODE="$(curl -sS -o /tmp/smoke.html -w '%{http_code}' "$URL" --max-time 15 || echo 000)"
+              if [ "$HTTP_CODE" = "200" ]; then
+                break
+              fi
+              echo "[smoke] attempt $attempt: HTTP $HTTP_CODE, retrying in 5s..."
+              sleep 5
+            done
             if [ "$HTTP_CODE" != "200" ]; then
-              echo "[smoke] FAIL: $URL → HTTP $HTTP_CODE" >&2
+              echo "[smoke] FAIL: $URL → HTTP $HTTP_CODE after 5 attempts" >&2
               head -20 /tmp/smoke.html >&2 || true
               exit 1
             fi
