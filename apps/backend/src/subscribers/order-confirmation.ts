@@ -1,9 +1,11 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework"
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils"
 
-// Order payload shape as emitted on `order.created`. We only declare the
+// Order payload shape as emitted on `order.placed`. We only declare the
 // fields we actually read; the full type is `OrderDTO` from `@medusajs/types`
 // but we keep this minimal and avoid an extra type import for a single use.
+// (Medusa v2 emits `order.placed` — `order.created` was a stale example
+// from the bundled configurable-notifications subscriber; fixed in #7.)
 type OrderEventPayload = {
   id: string
   email?: string | null
