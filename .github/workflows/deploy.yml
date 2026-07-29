@@ -113,6 +113,34 @@ jobs:
             cd "$PROD_DIR"
             echo "[deploy] start IMAGE=$IMAGE:$DEPLOY_SHA ts=$(date -u +%FT%TZ)"
 
+            # Sync the repo on prod. /docker/medusa is a git checkout,
+            # not a manually-uploaded scrap. We pin to the COMMIT
+            # being deployed, NOT origin/HEAD, so a fast-forward
+            # during the deploy window can't put us ahead of the
+            # SHA we're about to roll out.
+            #
+            # The checkout is force-updated: any local modifications
+            # to tracked files (e.g. a stray docker-compose.yml edit)
+            # are discarded. .env files are gitignored, so they
+            # survive `git checkout --force`. A stray .deployed-sha
+            # is owned by the deploy, not the repo.
+            echo "[deploy] git fetch origin main"
+            git fetch --quiet origin main
+            echo "[deploy] git checkout (detached at $DEPLOY_SHA)"
+            git checkout --force --quiet "$DEPLOY_SHA" 2>&1 | sed 's/^/  /' || {
+              echo "[deploy] FATAL: git checkout $DEPLOY_SHA failed" >&2
+              git log --oneline -3 >&2 || true
+              exit 1
+            }
+
+            # Verify env files are present (gitignored). If a real
+            # first-time deploy, the operator must populate them.
+            for envfile in .env apps/backend/.env apps/storefront/.env; do
+              if [ ! -f "$envfile" ]; then
+                echo "[deploy] WARN: $envfile missing after checkout (operator must populate)" >&2
+              fi
+            done
+
             # Previous-SHA rollback target, written by the LAST
             # successful deploy and read by THIS deploy. Independent
             # of the image (which we don't author labels for).
