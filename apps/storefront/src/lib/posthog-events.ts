@@ -2,7 +2,8 @@
 
 import { cookies } from "next/headers"
 import { captureServer, identifyServer } from "./posthog-server"
-import { isPostHogEnabled, resolvePostHogDistinctId } from "./posthog-identity"
+import { isPostHogEnabled } from "./posthog-identity"
+import { resolvePostHogDistinctId } from "./posthog-identity-server"
 import { retrieveCustomer } from "./data/customer"
 import { getCartId } from "./data/cookies"
 import { sdk } from "./config"

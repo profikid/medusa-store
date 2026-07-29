@@ -1,10 +1,19 @@
 /* ==========================================================================
    District X — Design System / Globals
-   Layered on top of Medusa's admin UI. Safe to import alongside other styles.
+   Overrides Medusa UI's default theme tokens. Loaded globally, applies to
+   the entire admin (no scoping wrappers, no shadow DOM tricks). Drop the
+   import in a single place and the whole UI re-skins.
+
+   Order:
+   1. Brand tokens --dx-* (single source of truth)
+   2. Medusa UI override --bg-*, --fg-*, --border-*, --button-*, --tag-*
+      (re-points Medusa's Tailwind preset classes like bg-ui-bg-base)
+   3. District X component classes (.dx-btn, .dx-card, .dx-badge, .dx-pillar, ...)
+   4. DX utilities (.dx-flex, .dx-grid-*) for users who don't want Tailwind
    ========================================================================== */
 
 :root {
-  /* Surface */
+  /* ----- DX brand tokens ----- */
   --dx-bg-0:        #050505;
   --dx-bg-1:        #0A0A0A;
   --dx-bg-2:        #111111;
@@ -12,14 +21,12 @@
   --dx-border:      #232323;
   --dx-border-strong: #2E2E2E;
 
-  /* Text */
   --dx-text-100:    #F5F5F5;
   --dx-text-80:     #CFCFCF;
   --dx-text-60:     #8E8E8E;
   --dx-text-40:     #5A5A5A;
   --dx-text-20:     #333333;
 
-  /* Amber */
   --dx-amber-100:   #F9D78A;
   --dx-amber-200:   #F4B33A;
   --dx-amber-300:   #E89A1F;
@@ -27,30 +34,25 @@
   --dx-amber-500:   #8A5408;
   --dx-amber-glow:  rgba(232,154,31,0.22);
 
-  /* Supporting */
   --dx-cobalt:      #2E78D2;
   --dx-cobalt-soft: #1E4F94;
   --dx-emerald:     #2EA66F;
   --dx-rose:        #D24545;
   --dx-slate:       #6B6B6B;
 
-  /* Light variant */
   --dx-cream:       #F5F2EC;
   --dx-ink:         #1A1A1A;
 
-  /* Type */
   --dx-font-sans:    'Inter', 'Helvetica Neue', system-ui, -apple-system, sans-serif;
   --dx-font-display: 'Space Grotesk', 'Inter', sans-serif;
   --dx-font-mono:    'JetBrains Mono', ui-monospace, monospace;
 
-  /* Radius */
   --dx-r-1:    4px;
   --dx-r-2:    8px;
   --dx-r-3:    12px;
   --dx-r-4:    18px;
   --dx-r-pill: 999px;
 
-  /* Spacing */
   --dx-s-1: 4px;
   --dx-s-2: 8px;
   --dx-s-3: 12px;
@@ -61,34 +63,198 @@
   --dx-s-8: 64px;
   --dx-s-9: 96px;
 
-  /* Elevation */
   --dx-shadow-1: 0 1px 0 rgba(255,255,255,0.02) inset, 0 8px 24px rgba(0,0,0,0.4);
   --dx-shadow-2: 0 1px 0 rgba(255,255,255,0.04) inset, 0 16px 40px rgba(0,0,0,0.55);
   --dx-shadow-glow: 0 0 0 1px var(--dx-amber-300), 0 0 24px var(--dx-amber-glow);
 
-  /* Motion */
   --dx-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --dx-dur-fast: 120ms;
   --dx-dur: 220ms;
   --dx-dur-slow: 420ms;
+
+  /* ======================================================================
+     Medusa UI overrides — re-point every --bg-*, --fg-*, --border-*,
+     --button-*, --tag-* variable so the existing Tailwind utility classes
+     (bg-ui-bg-base, text-ui-fg-subtle, border-ui-border, bg-tag-blue-bg, ...)
+     all use District X values without touching Medusa's components.
+     ====================================================================== */
+
+  /* Backgrounds */
+  --bg-base:               var(--dx-bg-1);
+  --bg-base-hover:         var(--dx-bg-2);
+  --bg-base-pressed:       var(--dx-bg-3);
+  --bg-subtle:             var(--dx-bg-2);
+  --bg-subtle-hover:       var(--dx-bg-3);
+  --bg-subtle-pressed:     var(--dx-bg-3);
+  --bg-component:          var(--dx-bg-2);
+  --bg-component-hover:    var(--dx-bg-3);
+  --bg-component-pressed:  var(--dx-bg-3);
+  --bg-field:              var(--dx-bg-2);
+  --bg-field-hover:        var(--dx-bg-3);
+  --bg-field-component:    var(--dx-bg-2);
+  --bg-field-component-hover: var(--dx-bg-3);
+  --bg-interactive:        var(--dx-amber-300);
+  --bg-highlight:          rgba(232, 154, 31, 0.12);
+  --bg-highlight-hover:    rgba(232, 154, 31, 0.18);
+  --bg-disabled:           var(--dx-bg-3);
+  --bg-overlay:            rgba(0, 0, 0, 0.65);
+  --bg-switch-off:         var(--dx-bg-3);
+  --bg-switch-off-hover:   var(--dx-bg-2);
+
+  /* Foregrounds */
+  --fg-base:               var(--dx-text-100);
+  --fg-subtle:             var(--dx-text-60);
+  --fg-muted:              var(--dx-text-40);
+  --fg-disabled:           var(--dx-text-20);
+  --fg-error:              var(--dx-rose);
+  --fg-interactive:        var(--dx-amber-300);
+  --fg-interactive-hover:  var(--dx-amber-200);
+  --fg-on-color:           var(--dx-bg-1);
+  --fg-on-inverted:        var(--dx-text-100);
+
+  /* Borders */
+  --border-base:           var(--dx-border);
+  --border-strong:         var(--dx-border-strong);
+  --border-interactive:    var(--dx-amber-300);
+  --border-danger:         var(--dx-rose);
+  --border-error:          var(--dx-rose);
+  --border-menu-top:       var(--dx-border);
+  --border-menu-bot:       var(--dx-border);
+  --border-transparent:    transparent;
+  --borders-base:          var(--dx-border);
+  --borders-error:         var(--dx-rose);
+  --borders-focus:         var(--dx-amber-300);
+  --borders-interactive-with-active: var(--dx-amber-300);
+  --borders-interactive-with-shadow: var(--dx-amber-glow);
+
+  /* Buttons */
+  --button-neutral:        var(--dx-bg-2);
+  --button-neutral-hover:  var(--dx-bg-3);
+  --button-neutral-pressed: var(--dx-bg-3);
+  --button-inverted:       var(--dx-amber-300);
+  --button-inverted-hover: var(--dx-amber-200);
+  --button-inverted-pressed: var(--dx-amber-400);
+  --button-danger:         var(--dx-rose);
+  --button-danger-hover:   #B73B3B;
+  --button-danger-pressed: #A33333;
+  --button-transparent:    transparent;
+  --button-transparent-hover: var(--dx-bg-2);
+  --button-transparent-pressed: var(--dx-bg-3);
+  --buttons-neutral:       var(--dx-bg-2);
+
+  /* Contrast surfaces (popovers, code blocks) */
+  --contrast-bg-base:      var(--dx-bg-2);
+  --contrast-bg-base-hover: var(--dx-bg-3);
+  --contrast-bg-base-pressed: var(--dx-bg-3);
+  --contrast-bg-subtle:    var(--dx-bg-1);
+  --contrast-border-base:  var(--dx-border-strong);
+  --contrast-border-bot:   var(--dx-border);
+  --contrast-border-top:   var(--dx-border);
+  --contrast-fg-primary:   var(--dx-text-100);
+  --contrast-fg-secondary: var(--dx-text-60);
+  --details-contrast-on-bg-interactive: var(--dx-bg-1);
+  --elevation-code-block:  var(--dx-shadow-2);
+
+  /* Tags */
+  --tag-neutral-bg:        var(--dx-bg-2);
+  --tag-neutral-bg-hover:  var(--dx-bg-3);
+  --tag-neutral-border:    var(--dx-border);
+  --tag-neutral-icon:      var(--dx-text-60);
+  --tag-neutral-text:      var(--dx-text-80);
+
+  --tag-blue-bg:           rgba(46, 120, 210, 0.12);
+  --tag-blue-bg-hover:     rgba(46, 120, 210, 0.18);
+  --tag-blue-border:       rgba(46, 120, 210, 0.3);
+  --tag-blue-icon:         var(--dx-cobalt);
+  --tag-blue-text:         var(--dx-cobalt);
+
+  --tag-red-bg:            rgba(210, 69, 69, 0.12);
+  --tag-red-bg-hover:      rgba(210, 69, 69, 0.18);
+  --tag-red-border:        rgba(210, 69, 69, 0.3);
+  --tag-red-icon:          var(--dx-rose);
+  --tag-red-text:          var(--dx-rose);
+
+  --tag-orange-bg:         rgba(232, 154, 31, 0.12);
+  --tag-orange-bg-hover:   rgba(232, 154, 31, 0.18);
+  --tag-orange-border:     rgba(232, 154, 31, 0.3);
+  --tag-orange-icon:       var(--dx-amber-300);
+  --tag-orange-text:       var(--dx-amber-200);
+
+  --tag-green-bg:          rgba(46, 166, 111, 0.12);
+  --tag-green-bg-hover:    rgba(46, 166, 111, 0.18);
+  --tag-green-border:      rgba(46, 166, 111, 0.3);
+  --tag-green-icon:        var(--dx-emerald);
+  --tag-green-text:        var(--dx-emerald);
+
+  --tag-purple-bg:         rgba(168, 85, 247, 0.12);
+  --tag-purple-bg-hover:   rgba(168, 85, 247, 0.18);
+  --tag-purple-border:     rgba(168, 85, 247, 0.3);
+  --tag-purple-icon:       #A855F7;
+  --tag-purple-text:       #C084FC;
 }
 
-/* Scope: District X utilities are namespaced to .dx-scope so they don't
-   override Medusa's own UI tokens. Apply the class on a container to opt in. */
-.dx-scope {
-  font-family: var(--dx-font-sans);
+/* ==========================================================================
+   Global typography — Inter everywhere, JetBrains Mono for code/numbers.
+   Medusa UI uses Inter by default, so we mainly fix up the mono + display.
+   ========================================================================== */
+
+html, body {
+  background: var(--dx-bg-0);
   color: var(--dx-text-100);
-  font-size: 15px;
-  line-height: 1.55;
+  font-family: var(--dx-font-sans);
+  font-size: 14px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-.dx-scope *,
-.dx-scope *::before,
-.dx-scope *::after {
-  box-sizing: border-box;
+body {
+  background-image:
+    radial-gradient(1200px 600px at 80% -10%, rgba(232,154,31,0.06), transparent 60%),
+    radial-gradient(900px 500px at 0% 100%, rgba(46, 120, 210, 0.04), transparent 60%);
+  background-attachment: fixed;
 }
+
+code, pre, kbd, samp, .dx-mono {
+  font-family: var(--dx-font-mono) !important;
+}
+
+::selection {
+  background: var(--dx-amber-glow);
+  color: var(--dx-text-100);
+}
+
+/* --- Scrollbar (WebKit) --- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--dx-bg-0);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--dx-bg-3);
+  border-radius: var(--dx-r-pill);
+  border: 2px solid var(--dx-bg-0);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--dx-border-strong);
+}
+
+/* --- Tailwind defaults used by Medusa UI --- */
+.bg-button-inverted      { background: var(--dx-amber-300); color: var(--dx-bg-1); }
+.bg-button-inverted:hover { background: var(--dx-amber-200); }
+.text-button-inverted    { color: var(--dx-bg-1); }
+
+/* Focus ring everywhere */
+*:focus-visible {
+  outline: 2px solid var(--dx-amber-300);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   District X component classes
+   ========================================================================== */
 
 /* Buttons */
 .dx-btn {
@@ -180,7 +346,7 @@
   flex-shrink: 0;
 }
 
-/* Badge */
+/* Badge — works alongside Medusa's bg-tag-* classes */
 .dx-badge {
   display: inline-flex;
   align-items: center;
@@ -266,7 +432,7 @@
   margin-bottom: 6px;
 }
 
-/* Eyebrow + heading */
+/* Typography */
 .dx-eyebrow {
   font-family: var(--dx-font-mono);
   font-size: 11px;
@@ -353,7 +519,7 @@
   color: var(--dx-amber-300);
   margin-bottom: 20px;
 }
-.dx-pillar--cobalt .dx-pillar__icon { color: var(--dx-cobalt); }
+.dx-pillar--cobalt  .dx-pillar__icon { color: var(--dx-cobalt); }
 .dx-pillar--emerald .dx-pillar__icon { color: var(--dx-emerald); }
 .dx-pillar__num {
   font-family: var(--dx-font-mono);
@@ -369,7 +535,7 @@
   letter-spacing: -0.01em;
 }
 .dx-pillar__title .x { color: var(--dx-amber-300); }
-.dx-pillar--cobalt .dx-pillar__title .x { color: var(--dx-cobalt); }
+.dx-pillar--cobalt  .dx-pillar__title .x { color: var(--dx-cobalt); }
 .dx-pillar--emerald .dx-pillar__title .x { color: var(--dx-emerald); }
 .dx-pillar__body {
   color: var(--dx-text-60);
@@ -484,15 +650,13 @@
 }
 .dx-lockup--light .dx-lockup__lbl { color: var(--dx-text-60); }
 .dx-lockup--amber .dx-lockup__lbl { color: var(--dx-bg-1); }
-
-/* Lockup SVG sizing */
 .dx-lockup svg {
   max-width: 70%;
   max-height: 70%;
   height: auto;
 }
 
-/* Progress / meter */
+/* Progress */
 .dx-meter {
   width: 100%;
   height: 6px;
@@ -583,7 +747,7 @@
   color: var(--dx-amber-200);
 }
 
-/* Pill nav */
+/* Nav */
 .dx-nav {
   display: flex;
   gap: 4px;
@@ -603,7 +767,7 @@
   background: var(--dx-bg-2);
 }
 
-/* Decorative line under section titles */
+/* Decorative line */
 .dx-deco-line {
   display: flex;
   align-items: center;
@@ -617,7 +781,10 @@
   background: var(--dx-amber-300);
 }
 
-/* Utilities */
+/* ==========================================================================
+   DX utilities
+   ========================================================================== */
+
 .dx-text-amber { color: var(--dx-amber-300); }
 .dx-text-cobalt { color: var(--dx-cobalt); }
 .dx-text-emerald { color: var(--dx-emerald); }

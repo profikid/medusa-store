@@ -13,12 +13,16 @@ import {
   Textarea,
 } from "../../design-system/components"
 import { brand, color } from "../../design-system/tokens"
-
-import "../../design-system/globals.css"
+import { injectDXStyles } from "../../design-system/inject"
+import { useEffect } from "react"
 
 const DistrictXPage = () => {
+  useEffect(() => {
+    injectDXStyles()
+  }, [])
+
   return (
-    <div className="dx-scope" style={{ padding: 32, maxWidth: 1280, margin: "0 auto" }}>
+    <div style={{ padding: 32, maxWidth: 1280, margin: "0 auto" }}>
       {/* Top bar */}
       <header
         style={{

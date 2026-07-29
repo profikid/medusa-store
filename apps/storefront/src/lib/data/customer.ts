@@ -23,7 +23,7 @@ import {
   resetStorefrontIdentity,
   trackStorefrontEvent,
 } from "@lib/posthog-events"
-import { resolvePostHogDistinctId } from "@lib/posthog-identity"
+import { resolvePostHogDistinctId } from "@lib/posthog-identity-server"
 
 export type CustomerAuthState =
   | { state: "error"; error: string }
