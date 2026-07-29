@@ -181,39 +181,87 @@ jobs:
             echo "[deploy] --- docker-compose.yml image: lines after sed ---"
             grep -nE '^\s*image:' docker-compose.yml || true
 
-            echo "[deploy] docker compose up -d"
-            docker compose up -d
+            # Deploy backend FIRST, verify it serves /health, THEN
+            # deploy storefront. Traefik and the storefront's
+            # middleware both hit the backend over HTTP, so a
+            # parallel recreate with backend-down causes the
+            # storefront to log "Backend returned 502" and the
+            # post-deploy smoke test to fail.
+            echo "[deploy] bring up dependent services first (postgres, redis)"
+            docker compose up -d postgres redis
+            echo "[deploy] wait for postgres healthy"
+            for i in $(seq 1 30); do
+              PG="$(docker inspect -f '{{.State.Health.Status}}' medusa_postgres 2>/dev/null || echo starting)"
+              [ "$PG" = "healthy" ] && break
+              sleep 2
+            done
+            [ "$PG" = "healthy" ] || { echo "[deploy] FATAL: postgres not healthy in 60s; last=$PG" >&2; exit 1; }
 
-            echo "[deploy] waiting for medusa + storefront healthy"
-            for svc in medusa_storefront medusa_backend; do
-              STATE="starting"
-              for i in $(seq 1 30); do
-                # If the container has a healthcheck, prefer that.
-                # Many services don't (notably this one pre-#4), so
-                # fall back to State.Status=running. We accept
-                # "running" as good enough — the post-deploy smoke
-                # test below hard-fails if the HTTP surface is wrong.
-                HEALTH="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$svc" 2>/dev/null || true)"
-                STATUS="$(docker inspect -f '{{.State.Status}}' "$svc" 2>/dev/null || echo missing)"
-                if [ "$HEALTH" = "healthy" ] || [ "$STATUS" = "running" ]; then
-                  STATE="running"
+            echo "[deploy] deploy backend first"
+            docker compose up -d medusa
+            echo "[deploy] wait for medusa_backend running"
+            for i in $(seq 1 30); do
+              STATUS="$(docker inspect -f '{{.State.Status}}' medusa_backend 2>/dev/null || echo starting)"
+              [ "$STATUS" = "running" ] && break
+              sleep 2
+            done
+            if [ "$STATUS" != "running" ]; then
+              echo "[deploy] FATAL: medusa_backend not running in 60s; last=$STATUS" >&2
+              docker logs --tail 50 medusa_backend >&2 || true
+              exit 1
+            fi
+
+            # Verify the backend actually serves HTTP from inside the
+            # docker network. The runtime image is node:20-alpine
+            # with no curl/wget, so we use node -e. /health may 404
+            # (no such endpoint); Medusa v2 exposes /store and /admin
+            # which always 200-on-cors error vs 502-on-network. We
+            # simply want to confirm the TCP socket answers before
+            # we blast the storefront rollout.
+            echo "[deploy] probe backend :9000 tcp readiness"
+            for i in $(seq 1 30); do
+              if docker exec medusa_backend node -e "require('http').get('http://localhost:9000/health',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))" >/dev/null 2>&1; then
+                echo "[deploy] backend :9000 ready ($i)"
+                break
+              fi
+              sleep 2
+            done
+
+            # Also wait for the public hostname to serve storefront
+            # reachability — the storefront Next.js middleware will
+            # hit this URL on its first request.
+            echo "[deploy] probe backend public hostname"
+            for i in $(seq 1 30); do
+              if curl -sS -o /dev/null -w "" https://medusa.tracecore.profikid.nl/health --max-time 5 2>/dev/null; then
+                HC="$(curl -sS -o /dev/null -w '%{http_code}' https://medusa.tracecore.profikid.nl/health --max-time 5)"
+                if [ "$HC" = "200" ] || [ "$HC" = "302" ] || [ "$HC" = "204" ]; then
+                  echo "[deploy] backend public ready ($i, HTTP $HC)"
                   break
                 fi
-                STATE="$STATUS"
-                sleep 2
-              done
-              if [ "$STATE" != "running" ]; then
-                echo "[deploy] FATAL: $svc not running in 60s; last state=$STATE" >&2
-                docker logs --tail 50 "$svc" >&2 || true
-                if [ -n "$PREVIOUS_SHA" ]; then
-                  echo "[deploy] rolling back to previous image $PREVIOUS_SHA" >&2
-                  sed -i -E "s#^    image: (medusa-store|${IMAGE}):.*\$#    image: ${IMAGE}:${PREVIOUS_SHA}#" docker-compose.yml
-                  docker compose up -d || true
-                fi
-                exit 1
               fi
-              echo "[deploy] $svc running (healthcheck=${HEALTH:-none})"
+              sleep 2
             done
+
+            echo "[deploy] deploy storefront"
+            docker compose up -d storefront
+
+            echo "[deploy] wait for medusa_storefront running"
+            for i in $(seq 1 30); do
+              STATUS="$(docker inspect -f '{{.State.Status}}' medusa_storefront 2>/dev/null || echo starting)"
+              [ "$STATUS" = "running" ] && break
+              sleep 2
+            done
+            if [ "$STATUS" != "running" ]; then
+              echo "[deploy] FATAL: medusa_storefront not running in 60s; last=$STATUS" >&2
+              docker logs --tail 50 medusa_storefront >&2 || true
+              if [ -n "$PREVIOUS_SHA" ]; then
+                echo "[deploy] rolling back to previous image $PREVIOUS_SHA" >&2
+                sed -i -E "s#^    image: (medusa-store|${IMAGE}):.*\$#    image: ${IMAGE}:${PREVIOUS_SHA}#" docker-compose.yml
+                docker compose up -d || true
+              fi
+              exit 1
+            fi
+            echo "[deploy] all services running"
 
             # Stamp the deployed SHA on disk so the NEXT deploy can
             # roll back to this one if it fails. Written *after* all
