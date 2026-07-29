@@ -48,6 +48,82 @@ module.exports = defineConfig({
   },
   modules: [
     {
+      // Workflow Engine Module — Redis-backed. The default in-memory
+      // provider loses workflow state on every container restart, which
+      // breaks long-running workflows (e.g. abandoned-cart reminders,
+      // scheduled jobs) across deploys. Redis persists transaction state
+      // and enables distributed execution across multiple instances.
+      // Resolves to Modules.WORKFLOW_ENGINE in container.
+      resolve: '@medusajs/medusa/workflow-engine-redis',
+      options: {
+        redis: {
+          redisUrl: process.env.WE_REDIS_URL,
+        },
+      },
+    },
+    {
+      // Caching Module — Redis-backed. The Caching Module (>= v2.11.0)
+      // is the non-transactional cache layer used by Medusa internals and
+      // by app code via `cache.getOrCompute` etc. Redis gives us shared
+      // cache across instances and persistence across restarts.
+      resolve: '@medusajs/medusa/caching',
+      options: {
+        providers: [
+          {
+            resolve: '@medusajs/caching-redis',
+            id: 'caching-redis',
+            is_default: true,
+            options: {
+              redisUrl: process.env.CACHE_REDIS_URL,
+            },
+          },
+        ],
+      },
+    },
+    {
+      // Event Module — Redis-backed. Powers Medusa's pub/sub event bus
+      // via BullMQ. Required for cross-instance event delivery (e.g.
+      // subscribers firing on order.placed when the storefront and
+      // backend are separate processes). The default in-memory provider
+      // does not propagate events across instances.
+      resolve: '@medusajs/medusa/event-bus-redis',
+      options: {
+        redisUrl: process.env.EVENTS_REDIS_URL,
+        // Keeps job history bounded so Redis doesn't grow unbounded.
+        // Tune in production per traffic profile.
+        jobOptions: {
+          removeOnComplete: {
+            age: 3600,
+            count: 1000,
+          },
+          removeOnFail: {
+            age: 3600,
+            count: 1000,
+          },
+        },
+      },
+    },
+    {
+      // Locking Module — Redis-backed. Distributed locks (via
+      // container.resolve(Modules.LOCKING)) coordinate work across
+      // multiple backend instances. Required for safe concurrent
+      // execution of workflows, scheduled jobs, and any flow that needs
+      // exactly-once semantics.
+      resolve: '@medusajs/medusa/locking',
+      options: {
+        providers: [
+          {
+            resolve: '@medusajs/medusa/locking-redis',
+            id: 'locking-redis',
+            is_default: true,
+            options: {
+              redisUrl: process.env.LOCKING_REDIS_URL,
+            },
+          },
+        ],
+      },
+    },
+    {
       // Stripe Module Provider — included by default in @medusajs/medusa.
       // Provides Payment Element checkout (cards, iDEAL, Bancontact, SEPA, Apple Pay, Google Pay).
       // Provider ID is "stripe" — Medusa exposes it as "pp_stripe_stripe" in the storefront.

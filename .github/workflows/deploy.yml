@@ -141,6 +141,29 @@ jobs:
               fi
             done
 
+            # Idempotent env var sync: ensure the Redis infra-module
+            # URLs are present in apps/backend/.env, mirroring REDIS_URL.
+            # We do this in deploy so adding a new env var in a future
+            # release only requires a code change + a deploy, not a
+            # manual SSH edit on prod. Re-running is safe: only inserts
+            # lines that aren't already present.
+            if [ -f apps/backend/.env ]; then
+              REDIS_BASE="$(grep -E '^REDIS_URL=' apps/backend/.env | head -1 | cut -d= -f2-)"
+              if [ -z "$REDIS_BASE" ]; then
+                echo "[deploy] WARN: REDIS_URL not set in apps/backend/.env; cannot derive module URLs" >&2
+              else
+                for kv in "WE_REDIS_URL=$REDIS_BASE" "CACHE_REDIS_URL=$REDIS_BASE" "EVENTS_REDIS_URL=$REDIS_BASE" "LOCKING_REDIS_URL=$REDIS_BASE"; do
+                  k="${kv%%=*}"
+                  if grep -qE "^${k}=" apps/backend/.env; then
+                    echo "[deploy] env already set: $k"
+                  else
+                    echo "[deploy] env append: $k"
+                    echo "$kv" >> apps/backend/.env
+                  fi
+                done
+              fi
+            fi
+
             # Previous-SHA rollback target, written by the LAST
             # successful deploy and read by THIS deploy. Independent
             # of the image (which we don't author labels for).
