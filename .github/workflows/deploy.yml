@@ -166,7 +166,7 @@ jobs:
                   fi
                 done
               fi
-              for k in SENDGRID_API_KEY SENDGRID_FROM; do
+              for k in SENDGRID_API_KEY SENDGRID_FROM SENDGRID_ORDER_TEMPLATE_ID; do
                 if grep -qE "^${k}=" apps/backend/.env; then
                   echo "[deploy] env already set: $k"
                 else
