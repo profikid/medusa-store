@@ -3,6 +3,7 @@
 import { ArrowRightOnRectangle } from "@medusajs/icons"
 import { clx } from "@modules/common/components/ui"
 import { useParams, usePathname } from "next/navigation"
+import posthog from "posthog-js"
 
 import { signout } from "@lib/data/customer"
 import { HttpTypes } from "@medusajs/types"
@@ -21,6 +22,11 @@ const AccountNav = ({
   const { countryCode } = useParams() as { countryCode: string }
 
   const handleLogout = async () => {
+    // Wipe browser-side identity before the server action runs so the
+    // next person on this device doesn't inherit this shopper's events.
+    if (process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN) {
+      posthog.reset()
+    }
     await signout(countryCode)
   }
 

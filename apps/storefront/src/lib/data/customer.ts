@@ -18,6 +18,12 @@ import {
   setAuthToken,
   setPendingCustomer,
 } from "./cookies"
+import {
+  identifyStorefrontCustomer,
+  resetStorefrontIdentity,
+  trackStorefrontEvent,
+} from "@lib/posthog-events"
+import { resolvePostHogDistinctId } from "@lib/posthog-identity"
 
 export type CustomerAuthState =
   | { state: "error"; error: string }
@@ -121,7 +127,22 @@ export async function signup(
 
   // Continue by logging in. The login response tells us whether the backend
   // requires email verification — we don't need a storefront-side flag.
-  return completeLogin(customerForm.email, password)
+  const result = await completeLogin(customerForm.email, password)
+
+  if (result?.state === "success") {
+    // Resolve a stable distinct ID BEFORE identifying so the
+    // signature flow runs under the same profile as the rest of the
+    // session. New users have just generated a fresh ID; we hand it
+    // to identifyStorefrontCustomer so the resulting PostHog person
+    // is created with that exact ID.
+    const distinctId = await resolvePostHogDistinctId()
+    await identifyStorefrontCustomer(distinctId ?? undefined)
+    await trackStorefrontEvent("user_signed_up", {
+      signup_method: "storefront",
+    })
+  }
+
+  return result
 }
 
 export async function login(
@@ -131,7 +152,17 @@ export async function login(
   const email = formData.get("email") as string
   const password = formData.get("password") as string
 
-  return completeLogin(email, password)
+  const result = await completeLogin(email, password)
+
+  if (result?.state === "success") {
+    const distinctId = await resolvePostHogDistinctId()
+    await identifyStorefrontCustomer(distinctId ?? undefined)
+    await trackStorefrontEvent("user_logged_in", {
+      login_method: "storefront",
+    })
+  }
+
+  return result
 }
 
 // Logs the customer in and reconciles the customer record. The behavior is
@@ -249,6 +280,12 @@ export async function confirmEmailVerification(
 
 export async function signout(countryCode: string) {
   await sdk.auth.logout()
+
+  await trackStorefrontEvent("user_signed_out", {})
+
+  // Clear the persistent profile ID so the next person on this
+  // device doesn't inherit the previous shopper's identity.
+  resetStorefrontIdentity()
 
   await removeAuthToken()
 

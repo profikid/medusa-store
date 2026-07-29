@@ -15,6 +15,7 @@ import {
 } from "./cookies"
 import { getRegion } from "./regions"
 import { getLocale } from "./locale-actions"
+import { trackStorefrontEvent } from "@lib/posthog-events"
 
 /**
  * Retrieves a cart by its ID. If no ID is provided, it will use the cart ID from the cookies.
@@ -153,6 +154,11 @@ export async function addToCart({
 
       const fulfillmentCacheTag = await getCacheTag("fulfillment")
       revalidateTag(fulfillmentCacheTag)
+
+      await trackStorefrontEvent("product_added_to_cart", {
+        variant_id: variantId,
+        quantity,
+      })
     })
     .catch(medusaError)
 }
@@ -186,6 +192,11 @@ export async function updateLineItem({
 
       const fulfillmentCacheTag = await getCacheTag("fulfillment")
       revalidateTag(fulfillmentCacheTag)
+
+      await trackStorefrontEvent("cart_line_item_updated", {
+        line_id: lineId,
+        quantity,
+      })
     })
     .catch(medusaError)
 }
@@ -213,6 +224,10 @@ export async function deleteLineItem(lineId: string) {
 
       const fulfillmentCacheTag = await getCacheTag("fulfillment")
       revalidateTag(fulfillmentCacheTag)
+
+      await trackStorefrontEvent("cart_line_item_removed", {
+        line_id: lineId,
+      })
     })
     .catch(medusaError)
 }
@@ -233,6 +248,10 @@ export async function setShippingMethod({
     .then(async () => {
       const cartCacheTag = await getCacheTag("carts")
       revalidateTag(cartCacheTag)
+
+      await trackStorefrontEvent("shipping_method_selected", {
+        shipping_option_id: shippingMethodId,
+      })
     })
     .catch(medusaError)
 }
@@ -274,6 +293,10 @@ export async function applyPromotions(codes: string[]) {
 
       const fulfillmentCacheTag = await getCacheTag("fulfillment")
       revalidateTag(fulfillmentCacheTag)
+
+      await trackStorefrontEvent("promotion_codes_applied", {
+        promotion_codes: codes,
+      })
     })
     .catch(medusaError)
 }
@@ -417,6 +440,17 @@ export async function placeOrder(cartId?: string) {
 
     const orderCacheTag = await getCacheTag("orders")
     revalidateTag(orderCacheTag)
+
+    // The backend order.placed subscriber is the source of truth for
+    // order_placed: it has the full order and the customer ID. We only
+    // fire a confirmation-side `order_confirmed` event here so the
+    // storefront session knows the user reached the thank-you page.
+    await trackStorefrontEvent("order_confirmed", {
+      order_id: cartRes.order.id,
+      order_display_id: cartRes.order.display_id,
+      order_total: cartRes.order.total,
+      order_currency_code: cartRes.order.currency_code,
+    })
 
     removeCartId()
     redirect(`/${countryCode}/order/${cartRes?.order.id}/confirmed`)
