@@ -55,7 +55,7 @@ export default async function orderConfirmationHandler({
     error: (msg: string, meta?: unknown) => void
   }
 
-  // `order.created` payloads carry only the order id in the event itself.
+  // `order.placed` payloads carry only the order id in the event itself.
   // We resolve the order service to fetch the full order so we can render
   // an email with the items, totals, and customer email.
   const query = container.resolve(ContainerRegistrationKeys.QUERY) as {
@@ -126,7 +126,7 @@ export default async function orderConfirmationHandler({
   const payload = {
     to: order.email,
     channel: "email",
-    trigger_type: "order.created",
+    trigger_type: "order.placed",
     resource_id: order.id,
     data: {
       order_id: order.id,
@@ -159,7 +159,7 @@ export default async function orderConfirmationHandler({
 }
 
 export const config: SubscriberConfig = {
-  event: "order.created",
+  event: "order.placed",
   context: {
     subscriberId: "order-confirmation",
   },
