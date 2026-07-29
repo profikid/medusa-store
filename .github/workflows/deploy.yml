@@ -95,7 +95,7 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
           DEPLOY_SHA: ${{ steps.sha.outputs.sha }}
           IMAGE_REPO: profikid/medusa-store
-          IMAGE: ghcr.io/${{ env.IMAGE_REPO }}
+          IMAGE: ghcr.io/profikid/medusa-store
         run: |
           set -euo pipefail
           ssh -i ~/.ssh/id_ed25519 \
