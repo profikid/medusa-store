@@ -6,10 +6,12 @@
 #   2. Runtime image copies prebuilt artifacts only (no devDeps, no source)
 #
 # Build args:
-#   NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY  - storefront build needs this baked in
-#   NEXT_PUBLIC_MEDUSA_BACKEND_URL      - same
-#   NEXT_PUBLIC_BASE_URL                - same
-#   NEXT_PUBLIC_DEFAULT_REGION          - same
+#   NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY   - storefront build needs this baked in
+#   NEXT_PUBLIC_MEDUSA_BACKEND_URL       - same
+#   NEXT_PUBLIC_BASE_URL                 - same
+#   NEXT_PUBLIC_DEFAULT_REGION           - same
+#   NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN    - PostHog analytics (defaulted, public token)
+#   NEXT_PUBLIC_POSTHOG_HOST             - same
 #
 # Override ENTRYPOINT per service via docker-compose.yml to choose
 # medusa start / next start vs medusa develop / next dev.
@@ -52,10 +54,17 @@ ARG NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
 ARG NEXT_PUBLIC_MEDUSA_BACKEND_URL
 ARG NEXT_PUBLIC_BASE_URL
 ARG NEXT_PUBLIC_DEFAULT_REGION
+# PostHog analytics (public project token, safe to bake into the client bundle).
+# Defaulted here so the image works out of the box without a repo secret; override
+# via build-arg / docker-compose.yml if the PostHog project ever changes.
+ARG NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN=phc_CPQgsE99yvvWPkBM6YFcVk95WwTLwZvnALQnVR5BPqv7
+ARG NEXT_PUBLIC_POSTHOG_HOST=https://eu.i.posthog.com
 ENV NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=${NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY}
 ENV NEXT_PUBLIC_MEDUSA_BACKEND_URL=${NEXT_PUBLIC_MEDUSA_BACKEND_URL}
 ENV NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
 ENV NEXT_PUBLIC_DEFAULT_REGION=${NEXT_PUBLIC_DEFAULT_REGION}
+ENV NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN=${NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN}
+ENV NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST}
 
 # Skip type checking + lint during build (faster, we trust the dev loop)
 ENV NEXT_TELEMETRY_DISABLED=1
