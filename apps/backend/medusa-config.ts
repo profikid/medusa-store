@@ -124,6 +124,46 @@ module.exports = defineConfig({
       },
     },
     {
+      // Analytics Module — Local provider. Logs events to backend
+      // console at debug level. Set LOG_LEVEL=debug in the env to see
+      // events. Only one analytics provider per app; PostHog/Segment
+      // can be swapped in by replacing the provider URI when needed.
+      // Resolves to Modules.ANALYTICS in the container.
+      resolve: '@medusajs/medusa/analytics',
+      options: {
+        providers: [
+          {
+            resolve: '@medusajs/analytics-local',
+            id: 'local',
+          },
+        ],
+      },
+    },
+    {
+      // Notification Module — SendGrid provider (email channel).
+      // Channels are mutually exclusive per channel id, so we register
+      // SendGrid only. If SENDGRID_API_KEY is missing at boot, the
+      // provider will fail to construct and Medusa will refuse to start
+      // — empty keys are an operator error, not a soft fallback. To
+      // run without real email, comment out this module block; Medusa
+      // will fall back to its built-in 'local' logger.
+      // Resolves to Modules.NOTIFICATION in the container.
+      resolve: '@medusajs/medusa/notification',
+      options: {
+        providers: [
+          {
+            resolve: '@medusajs/medusa/notification-sendgrid',
+            id: 'sendgrid',
+            options: {
+              channels: ['email'],
+              api_key: process.env.SENDGRID_API_KEY,
+              from: process.env.SENDGRID_FROM,
+            },
+          },
+        ],
+      },
+    },
+    {
       // Stripe Module Provider — included by default in @medusajs/medusa.
       // Provides Payment Element checkout (cards, iDEAL, Bancontact, SEPA, Apple Pay, Google Pay).
       // Provider ID is "stripe" — Medusa exposes it as "pp_stripe_stripe" in the storefront.
